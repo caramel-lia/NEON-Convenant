@@ -96,65 +96,223 @@ class GameTest < Minitest::Test
     response
   end
 
-  def test_gemini_structured_scene_and_request_payload
-    gm = GameMaster.new(api_key: 'dummy-test-key', model: 'gemini-3.8-flash', demo: false)
-    response = gemini_response(
-      'status' => 'completed',
-      'steps' => [
-        { 'type' => 'model_output', 'content' => [
-          { 'type' => 'text', 'text' => JSON.generate(GameMaster.new(demo: true).generate(@room, opening: true)) }
-        ] }
-      ]
-    )
-    gm.define_singleton_method(:request_interaction) do |payload|
-      @sent_payload = payload
+  def completed_scene(scene, finish_reason: 'STOP')
+    gemini_response({ 'candidates' => [{
+      'finishReason' => finish_reason,
+      'content' => { 'role' => 'model', 'parts' => [{ 'text' => JSON.generate(scene) }] }
+    }] })
+  end
+
+  def test_gemini_structured_scene_payload
+    gm = GameMaster.new(api_key: 'test-key', demo: false)
+    opening = GameMaster.new(demo: true).generate(@room, opening: true)
+    reply = completed_scene(opening)
+    gm.define_singleton_method(:request_generation) do |payload|
+      @captured_payload = payload
+      reply
+    end
+    scene = gm.generate(@room, opening: true)
+    assert_equal 'THE CITY THAT NEVER BLINKS', scene['scene_title']
+    payload = gm.instance_variable_get(:@captured_payload)
+    assert_equal 'APPLICATION_JSON', payload.dig(:generationConfig, :responseFormat, :text, :mimeType)
+    assert_equal 'object', payload.dig(:generationConfig, :responseFormat, :text, :schema, :type)
+    assert_equal false, payload.dig(:generationConfig, :responseFormat, :text, :schema, :additionalProperties)
+    assert_equal 4096, payload.dig(:generationConfig, :maxOutputTokens)
+    assert_includes payload.dig(:systemInstruction, :parts, 0, :text), 'SWITCH//ZERO'
+    context = JSON.parse(payload.dig(:contents, 0, :parts, 0, :text))
+    assert context.key?('crew')
+    assert_equal true, context['task'].include?('opening choice')
+    refute_includes payload.to_s, @token
+  end
+
+  def test_gemini_missing_key_and_invalid_model
+    gm = GameMaster.new(api_key: '', demo: false)
+    err = assert_raises(GameError) { gm.generate(@room, opening: true) }
+    assert_equal 503, err.status
+    assert_includes err.message, 'GEMINI_API_KEY'
+    gm = GameMaster.new(api_key: 'test-key', model: '../bad', demo: false)
+    err = assert_raises(GameError) { gm.generate(@room, opening: true) }
+    assert_equal 503, err.status
+    assert_includes err.message, 'GEMINI_MODEL'
+  end
+
+  def test_gemini_http_request_uses_key_header_and_fixed_https_host
+    gm = GameMaster.new(api_key: 'secret-test-key', model: 'gemini-3.5-flash-lite', demo: false)
+    captured = nil
+    mock = Object.new
+    mock.define_singleton_method(:request) do |req|
+      captured = req
+      response = Net::HTTPOK.new('1.1', '200', 'OK')
+      response.body = '{}'
+      response.instance_variable_set(:@read, true)
       response
     end
-    story = gm.generate(@room, opening: true)
-    assert_equal 'THE CITY THAT NEVER BLINKS', story['scene_title']
-    payload = gm.instance_variable_get(:@sent_payload)
-    assert_equal 'gemini-3.8-flash', payload[:model]
-    assert_equal false, payload[:store]
-    assert_equal 'application/json', payload.dig(:response_format, :mime_type)
-    assert_equal 'object', payload.dig(:response_format, :schema, :type)
-    assert_includes payload[:system_instruction], 'SWITCH//ZERO'
-    refute_includes payload[:input], @token
-    assert_equal true, JSON.parse(payload[:input]).key?('crew')
-  end
-
-  def test_gemini_missing_key_and_incomplete_response
-    gm = GameMaster.new(api_key: '', demo: false)
-    exception = assert_raises(GameError) { gm.generate(@room, opening: true) }
-    assert_equal 503, exception.status
-    assert_includes exception.message, 'GEMINI_API_KEY'
-
-    gm = GameMaster.new(api_key: 'dummy-test-key', demo: false)
-    incomplete_response = gemini_response('status' => 'incomplete', 'steps' => [])
-    gm.define_singleton_method(:request_interaction) { |_| incomplete_response }
-    exception = assert_raises(GameError) { gm.generate(@room, opening: true) }
-    assert_equal 502, exception.status
-  end
-
-  def test_gemini_http_request_uses_server_secret_header
-    gm = GameMaster.new(api_key: 'test-only-secret', demo: false)
-    captured = nil
-    mock_connection = Object.new
-    mock_connection.define_singleton_method(:request) do |request|
-      captured = request
-      Net::HTTPOK.new('1.1', '200', 'OK')
-    end
-    Net::HTTP.stub(:start, ->(*args, **kwargs, &block) {
+    Net::HTTP.stub(:start, ->(*args, **kw, &block) {
       assert_equal 'generativelanguage.googleapis.com', args[0]
       assert_equal 443, args[1]
-      assert_equal true, kwargs[:use_ssl]
-      block.call(mock_connection)
+      assert_equal true, kw[:use_ssl]
+      block.call(mock)
     }) do
-      gm.request_interaction(model: 'gemini-3.8-flash', input: 'testing')
+      gm.request_generation(contents: [{ parts: [{ text: 'testing' }] }])
     end
-    assert_equal 'test-only-secret', captured['x-goog-api-key']
+    assert_equal 'secret-test-key', captured['x-goog-api-key']
+    assert_nil captured['Authorization']
+    assert_equal '/v1beta/models/gemini-3.5-flash-lite:generateContent', captured.path
     assert_equal 'application/json', captured['Content-Type']
-    refute_includes captured.body, 'test-only-secret'
-    assert_equal '/v1beta/interactions', captured.path
+    refute_includes captured.body, 'secret-test-key'
   end
 
+  def test_gemini_incomplete_and_empty_responses
+    gm = GameMaster.new(api_key: 'test-key', demo: false)
+    reply = completed_scene(GameMaster.new(demo: true).generate(@room, opening: true), finish_reason: 'MAX_TOKENS')
+    gm.define_singleton_method(:request_generation) { |_| reply }
+    err = assert_raises(GameError) { gm.generate(@room, opening: true) }
+    assert_equal 502, err.status
+    assert_includes err.message, 'did not complete'
+    reply = gemini_response('candidates' => [])
+    gm.define_singleton_method(:request_generation) { |_| reply }
+    assert_raises(GameError) { gm.generate(@room, opening: true) }
+  end
+
+  def test_gemini_invalid_json_and_invalid_outcome_rejected
+    gm = GameMaster.new(api_key: 'test-key', demo: false)
+    reply = gemini_response('candidates' => [{ 'finishReason' => 'STOP', 'content' => { 'parts' => [{ 'text' => 'not-json' }] } }])
+    gm.define_singleton_method(:request_generation) { |_| reply }
+    err = assert_raises(GameError) { gm.generate(@room) }
+    assert_equal 502, err.status
+
+    invalid = GameMaster.new(demo: true).generate(@room, opening: true)
+    invalid['outcomes'] = [{ 'player_id' => 'id', 'hp_delta' => 'bad', 'stress_delta' => 0, 'credits_delta' => 0, 'item_award' => '' }]
+    reply = completed_scene(invalid)
+    gm.define_singleton_method(:request_generation) { |_| reply }
+    err = assert_raises(GameError) { gm.generate(@room) }
+    assert_equal 502, err.status
+  end
+
+  def test_gemini_rate_limit_keeps_actions
+    gm = GameMaster.new(api_key: 'test-key', demo: false)
+    reply = Net::HTTPTooManyRequests.new('1.1', '429', 'Too Many Requests')
+    reply['retry-after'] = '15'
+    reply.body = JSON.generate({ error: { message: 'quota exhausted' } })
+    gm.define_singleton_method(:request_generation) { |_| reply }
+    err = assert_raises(GameError) { gm.generate(@room, opening: true) }
+    assert_equal 429, err.status
+    assert_includes err.message, '15 seconds'
+    assert_includes err.message, 'kept'
+  end
+
+  def test_gemini_api_error_and_demo_bypass
+    gm = GameMaster.new(api_key: 'test-key', demo: false)
+    reply = Net::HTTPForbidden.new('1.1', '403', 'Forbidden')
+    reply.body = JSON.generate({ error: { message: 'API key not allowed' } })
+    reply.instance_variable_set(:@read, true)
+    gm.define_singleton_method(:request_generation) { |_| reply }
+    err = assert_raises(GameError) { gm.generate(@room, opening: true) }
+    assert_equal 502, err.status
+    assert_includes err.message, 'HTTP 403'
+    assert_includes err.message, 'API key not allowed'
+
+    demo = GameMaster.new(api_key: nil, demo: true)
+    assert_equal 'THE CITY THAT NEVER BLINKS', demo.generate(@room, opening: true)['scene_title']
+  end
+end
+
+class TacticalGridTest < Minitest::Test
+  include NeonCovenant
+
+  def setup
+    @host, @token = Game.new_player(name: 'Voxel', role: 'solo', host: true)
+    @room = Game.new_room(code: 'ABCD2345', player: @host, theme: 'noir')
+  end
+
+  def test_grid_size_terrain_and_initial_position
+    map = @room['map']
+    assert_equal 14, map['width']
+    assert_equal 9, map['height']
+    assert_equal 126, map['tiles'].length
+    assert_equal({ 'x' => 1, 'y' => 4 }, map['positions'][@host['id']])
+    assert_includes map['tiles'], 'objective'
+    assert_includes map['tiles'], 'hazard'
+    assert map['tiles'].all? { |tile| TacticalMap::TILES.include?(tile) }
+  end
+
+  def test_five_crew_slots_get_distinct_positions
+    4.times do |index|
+      player, = Game.new_player(name: "Operative#{index}", role: 'ghost')
+      @room['players'] << player
+    end
+    TacticalMap.ensure!(@room)
+    assert_equal 5, @room['map']['positions'].size
+    assert_equal 5, @room['map']['positions'].values.uniq.size
+  end
+
+  def test_map_movement_and_distance_validated_by_server
+    start = TacticalMap.move!(@room, @host, x: 5, y: 4)
+    assert_equal({ 'x' => 1, 'y' => 4 }, start)
+    assert_equal 5, @room['map']['positions'][@host['id']]['x']
+    err = assert_raises(GameError) { TacticalMap.move!(@room, @host, x: 11, y: 4) }
+    assert_includes err.message, '4 steps'
+    assert_raises(GameError) { TacticalMap.move!(@room, @host, x: 14, y: 4) }
+    assert_raises(GameError) { TacticalMap.move!(@room, @host, x: '6', y: 4) }
+  end
+
+  def test_painting_walls_blocks_movement_and_protects_tokens
+    assert_raises(GameError) { TacticalMap.paint!(@room, x: 1, y: 4, terrain: 'wall') }
+    TacticalMap.paint!(@room, x: 2, y: 4, terrain: 'wall')
+    assert_equal 'wall', @room['map']['tiles'][TacticalMap.index(2, 4)]
+    assert_raises(GameError) { TacticalMap.move!(@room, @host, x: 2, y: 4) }
+    assert_raises(GameError) { TacticalMap.paint!(@room, x: 0, y: 0, terrain: '<script>') }
+  end
+
+  def test_player_cannot_overlap_another_player
+    player, = Game.new_player(name: 'Spark', role: 'techie')
+    @room['players'] << player
+    TacticalMap.ensure!(@room)
+    assert_raises(GameError) { TacticalMap.move!(@room, @host, x: 2, y: 4) }
+  end
+
+  def test_scene_change_regenerates_map_and_repositions_all_players
+    location = 'DISTRICT 13 // NEW WAREHOUSE'
+    TacticalMap.paint!(@room, x: 0, y: 0, terrain: 'cover')
+    before = @room['map']['location']
+    result = GameMaster.new(demo: true).generate(@room, opening: true)
+    result['location'] = location
+    Game.update_scene!(@room, result, opening: true)
+    refute_equal before, @room['map']['location']
+    assert_equal location, @room['map']['location']
+    assert_equal({ 'x' => 1, 'y' => 4 }, @room['map']['positions'][@host['id']])
+    assert @room['events'].any? { |event| event['kind'] == 'map' && event['text'].include?('GRID SYNC') }
+    assert_equal false, TacticalMap.sync_to_scene!(@room)
+  end
+
+  def test_legacy_room_migrates_in_existing_pstore
+    @room.delete('map')
+    Dir.mktmpdir do |dir|
+      store = Store.new(dir)
+      store.create(@room)
+      store.with_room('ABCD2345') { |room| assert_equal 126, room['map']['tiles'].size }
+      state = store.with_room('ABCD2345', readonly: true) do |room|
+        Game.public_state(room, player_id: @host['id'])
+      end
+      assert_equal 14, state['map']['width']
+      assert_equal 9, state['map']['height']
+      refute_includes state.to_s, @token
+    end
+  end
+
+  def test_manual_roll_is_independent_from_action_queue
+    100.times do
+      roll = Game.manual_roll(@host, count: 3, sides: 20, modifier: -2, reason: 'Perception')
+      assert_equal 3, roll['dice'].length
+      assert roll['dice'].all? { |die| die.between?(1, 20) }
+      assert_equal roll['dice'].sum - 2, roll['total']
+      assert_equal 'Perception', roll['reason']
+    end
+    assert_empty @room['actions']
+    assert_raises(GameError) { Game.manual_roll(@host, count: 9, sides: 6, modifier: 0) }
+    assert_raises(GameError) { Game.manual_roll(@host, count: 2, sides: 999, modifier: 0) }
+    assert_raises(GameError) { Game.manual_roll(@host, count: 2, sides: 6, modifier: 21) }
+    assert_raises(GameError) { Game.manual_roll(@host, count: '2', sides: 6, modifier: 0) }
+    assert_raises(GameError) { Game.manual_roll(@host, count: 1, sides: 6, modifier: 0, reason: 'x' * 81) }
+  end
 end

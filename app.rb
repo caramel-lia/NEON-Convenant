@@ -203,6 +203,69 @@ module NeonCovenant
       output(message: 'Disconnected from crew.')
     end
 
+    # Spatial operations use the same room transaction and bearer authorization
+    # as actions/chat. Only the host can edit or reset the terrain.
+    post '/api/rooms/:code/map/move' do
+      body = json_body
+      code = params[:code].upcase
+      state = STORE.with_room(code) do |room|
+        player = authenticate!(room)
+        raise GameError.new('Map is updating; retry after the GM finishes.', 409) if room['pending']
+        from = TacticalMap.move!(room, player, x: body['x'], y: body['y'])
+        dest = room['map']['positions'][player['id']]
+        if from != dest
+          room['events'] << Game.event('map', "#{player['name']} moved #{TacticalMap.cell_name(from['x'], from['y'])} → #{TacticalMap.cell_name(dest['x'], dest['y'])}.", 'player_id' => player['id'])
+          room['events'] = room['events'].last(100)
+        end
+        Game.public_state(room, player_id: player['id'])
+      end
+      output(state)
+    end
+
+    post '/api/rooms/:code/map/paint' do
+      body = json_body
+      code = params[:code].upcase
+      state = STORE.with_room(code) do |room|
+        player = authenticate!(room)
+        host!(player)
+        raise GameError.new('Map is updating; retry after the GM finishes.', 409) if room['pending']
+        TacticalMap.paint!(room, x: body['x'], y: body['y'], terrain: body['terrain'])
+        Game.public_state(room, player_id: player['id'])
+      end
+      output(state)
+    end
+
+    post '/api/rooms/:code/map/reset' do
+      code = params[:code].upcase
+      state = STORE.with_room(code) do |room|
+        player = authenticate!(room)
+        host!(player)
+        raise GameError.new('Map is updating; retry after the GM finishes.', 409) if room['pending']
+        TacticalMap.reset!(room)
+        room['events'] << Game.event('map', "#{player['name']} regenerated the sector grid.")
+        room['events'] = room['events'].last(100)
+        Game.public_state(room, player_id: player['id'])
+      end
+      output(state)
+    end
+
+    post '/api/rooms/:code/roll' do
+      body = json_body
+      code = params[:code].upcase
+      state = STORE.with_room(code) do |room|
+        player = authenticate!(room)
+        r = Game.manual_roll(player, count: body['count'], sides: body['sides'],
+                             modifier: body['modifier'], reason: body['reason'])
+        plus = r['modifier'] >= 0 ? "+#{r['modifier']}" : r['modifier'].to_s
+        note = r['reason'].empty? ? '' : " // #{r['reason']}"
+        room['events'] << Game.event('roll', "#{player['name']} / MANUAL #{r['count']}d#{r['sides']} #{plus} → [#{r['dice'].join(', ')}] = #{r['total']}#{note}",
+                                     'player_id' => player['id'], 'manual' => true, 'dice' => r['dice'], 'total' => r['total'])
+        room['events'] = room['events'].last(100)
+        Game.public_state(room, player_id: player['id'])
+      end
+      output(state)
+    end
+
     post '/api/rooms/:code/chat' do
       body = json_body
       code = params[:code].upcase

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090f10">
+  <meta name="theme-color" content="#080817">
   <meta name="description" content="NEON COVENANT — a multiplayer cyberpunk tabletop RPG with an AI Game Master.">
   <title>NEON//COVENANT — rogue terminal RPG</title>
   <link rel="stylesheet" href="/style.css">
@@ -15,7 +15,7 @@
   <main id="landing" class="landing">
     <header class="landing-top">
       <div class="brand"><span class="brand-glyph">⟐</span> NEON<span class="double-slash">//</span>COVENANT <span class="brand-meta">[ RPG.OS ]</span></div>
-      <div class="top-telemetry"><span class="ping"></span> NETWORK READY <span class="header-sep">|</span> MERIDIAN-9 <span class="header-sep">|</span> v.0.9</div>
+      <div class="top-telemetry"><span class="ping"></span> NETWORK READY <span class="header-sep">|</span> MERIDIAN-9 <span class="header-sep">|</span> v.1.0 // GRID</div>
     </header>
     <div class="landing-body">
       <section class="hero">
@@ -25,7 +25,7 @@
         <p class="lead">A neon-drenched, choice-driven tabletop RPG. Assemble your crew. Roll the dice. Let an AI Game Master turn your reckless decisions into living consequences.</p>
         <div class="hero-metrics">
           <div><strong>01—05</strong><span>OPERATIVES</span></div>
-          <div><strong>2D6</strong><span>FATE ENGINE</span></div>
+          <div><strong>14×09</strong><span>TACTICAL GRID</span></div>
           <div><strong>∞</strong><span>STORIES</span></div>
         </div>
         <div class="district-skyline" aria-hidden="true"><pre>  ┆    ╷   ┆          ╷           ╷
@@ -64,7 +64,7 @@
           </div>
           <button id="entry-button" class="button-primary launch" type="submit"><span>INITIALIZE CAMPAIGN</span><span>↗</span></button>
         </form>
-        <p class="access-footnote">END-TO-END STORY / SERVER-ROLLED DICE / UP TO FIVE PLAYERS<br><span>API access is configured by the server operator.</span></p>
+        <p class="access-footnote">LIVE GRID / MANUAL DICE / UP TO FIVE PLAYERS<br><span>API access is configured by the server operator.</span></p>
       </section>
     </div>
     <footer class="landing-footer"><span>THE NETWORK IS WATCHING.</span><span>BUILD 09.77.221 / ALL SIGNALS ORIGINATE IN MERIDIAN-9</span></footer>
@@ -101,6 +101,14 @@
             <div class="story-kicker">◢ LIVE NARRATIVE / GM TRANSMISSION</div>
             <h2 id="scene-title">NO SIGNAL</h2>
             <div class="scene-headline"><span>OBJECTIVE</span><p id="scene-objective">STANDBY</p></div>
+            <section class="tactical-panel" aria-label="Shared tactical grid">
+              <div class="tactical-head"><div><div class="section-label">◢ 04 // TACTICAL GRID <span class="micro-tag">LIVE SYNC</span></div><div class="map-location" id="map-location">MERIDIAN-9 // STAGING GRID</div></div><div class="map-toolbar"><button type="button" class="map-mode active" id="map-move">[ MOVE ]</button><button type="button" class="map-mode" id="map-edit" hidden>[ HOST: EDIT ]</button><button type="button" class="map-mode subtle" id="map-reset" hidden title="Regenerate a grid from the current sector">↻</button></div></div>
+              <div id="map-palette" class="map-palette" hidden aria-label="Terrain paint selector"><span>PAINT &gt;</span><button type="button" data-terrain="floor">· FLOOR</button><button type="button" data-terrain="wall">▥ WALL</button><button type="button" data-terrain="cover">▤ COVER</button><button type="button" data-terrain="objective">◇ OBJECTIVE</button><button type="button" data-terrain="hazard">⚠ HAZARD</button></div>
+              <div class="map-grid-scroll"><div id="map-grid" class="map-grid" role="group" aria-label="Interactive 14 by 9 map grid"></div></div>
+              <div id="map-party" class="map-party" aria-label="Player map symbols"></div>
+              <div id="map-hint" class="map-hint">Select a tile to move your operative up to 4 squares. Walls and other operatives block movement.</div>
+              <div class="map-key"><span><b>·</b> FLOOR</span><span><b>▥</b> WALL</span><span><b>▤</b> COVER</span><span><b>◇</b> OBJECTIVE</span><span><b>⚠</b> HAZARD</span></div>
+            </section>
             <div id="scene-narration" class="scene-narration"></div>
             <div class="scenario-options"><div class="subhead">// SUGGESTED PATHS — OR WRITE YOUR OWN</div><div id="suggestions" class="suggestion-grid"></div></div>
           </div>
@@ -117,8 +125,17 @@
       </section>
       <aside class="transmissions pane">
         <div class="pane-header"><span>03 // DATASTREAM</span><span class="signal-bars">▂▄▆█</span></div>
-        <div class="filter-tabs"><button type="button" data-filter="all" class="filter active">ALL</button><button type="button" data-filter="gm" class="filter">GM</button><button type="button" data-filter="roll" class="filter">ROLLS</button><button type="button" data-filter="chat" class="filter">CREW CHAT</button></div>
+        <div class="filter-tabs"><button type="button" data-filter="all" class="filter active">ALL</button><button type="button" data-filter="gm" class="filter">GM</button><button type="button" data-filter="roll" class="filter">ROLLS</button><button type="button" data-filter="chat" class="filter">CHAT</button><button type="button" data-filter="map" class="filter">MAP</button></div>
         <div id="event-stream" class="event-stream" role="log" aria-live="off"></div>
+        <section class="dice-console" aria-label="Manual dice roller">
+          <div class="dice-header"><span>◢ DICE://MANUAL</span><span class="dice-live">2D6 / D20 / CUSTOM</span></div>
+          <div class="dice-fields"><label>COUNT<select id="roll-count" aria-label="Number of dice"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label><label>SIDES<select id="roll-sides" aria-label="Die sides"><option value="4">D4</option><option value="6" selected>D6</option><option value="8">D8</option><option value="10">D10</option><option value="12">D12</option><option value="20">D20</option><option value="100">D100</option></select></label><label>MOD<input id="roll-mod" type="number" value="0" min="-20" max="20" aria-label="Dice modifier"></label></div>
+          <div class="dice-quick"><button type="button" data-preset="2,6,0">2D6</button><button type="button" data-preset="1,20,0">D20</button><button type="button" data-preset="1,100,0">D100</button></div>
+          <input id="roll-reason" type="text" maxlength="80" placeholder="Optional roll note…" aria-label="Reason for manual roll">
+          <button id="roll-dice" type="button" class="dice-submit">⚄ ROLL TO DATASTREAM ↗</button>
+          <p id="last-roll" class="last-roll" aria-live="polite">NO MANUAL ROLLS LOGGED</p>
+          <div class="dice-note">SERVER RANDOMNESS // NO GM TURN USED</div>
+        </section>
         <div class="chat-compose"><div class="chat-label">◢ CREW CHANNEL // ENCRYPTED</div><div class="chat-row"><input id="chat-input" maxlength="500" placeholder="Send crew transmission…" aria-label="Crew chat"><button id="send-chat" type="button" aria-label="Send chat">↗</button></div></div>
       </aside>
     </div>

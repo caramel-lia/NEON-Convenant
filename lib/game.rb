@@ -30,6 +30,8 @@ module NeonCovenant
     end
   end
 
+  require_relative 'map'
+
   module Game
     module_function
 
@@ -66,7 +68,7 @@ module NeonCovenant
         'theme' => theme, 'status' => 'lobby', 'round' => 0,
         'pending' => false, 'pending_at' => nil, 'players' => [player], 'actions' => [],
         'scene' => nil, 'memory' => '', 'events' => [event('system', 'Liminal gate established. Awaiting crew uplink.')]
-      }
+      }.tap { |room| TacticalMap.ensure!(room) }
     end
 
     def event(kind, text, metadata = {})
@@ -80,7 +82,7 @@ module NeonCovenant
         'pending' => room['pending'], 'round' => room['round'], 'scene' => room['scene'],
         'players' => room['players'].map { |p| public_player(p, room) },
         'actions' => room['actions'].map { |a| { 'player_id' => a['player_id'], 'approach' => a['approach'], 'intent' => a['intent'], 'roll' => a['roll'] } },
-        'events' => room['events'].last(65), 'me' => player_id,
+        'events' => room['events'].last(65), 'map' => TacticalMap.ensure!(room), 'me' => player_id,
         'max_players' => MAX_PLAYERS
       }
     end
@@ -102,6 +104,22 @@ module NeonCovenant
         'roll' => { 'dice' => [die1, die2], 'bonus' => bonus, 'total' => die1 + die2 + bonus,
                     'difficulty' => difficulty, 'success' => die1 + die2 + bonus >= difficulty }
       }
+    end
+
+    # These are independent table dice. They DO NOT replace action rolls or
+    # automatically trigger the AI Game Master.
+    def manual_roll(player, count:, sides:, modifier:, reason: '')
+      unless count.is_a?(Integer) && count.between?(1, 8) &&
+             sides.is_a?(Integer) && [4, 6, 8, 10, 12, 20, 100].include?(sides) &&
+             modifier.is_a?(Integer) && modifier.between?(-20, 20)
+        raise GameError, 'Invalid dice request (1–8 dice, standard sides, modifier −20…+20).'
+      end
+      note = reason.to_s.strip.gsub(/[\u0000-\u001f\u007f]/, ' ')
+      raise GameError, 'Roll note must be 80 characters or fewer.' if note.length > 80
+      dice = Array.new(count) { SecureRandom.random_number(sides) + 1 }
+      { 'player_id' => player['id'], 'name' => player['name'],
+        'count' => count, 'sides' => sides, 'modifier' => modifier,
+        'dice' => dice, 'total' => dice.sum + modifier, 'reason' => note }
     end
 
     def apply_effects!(room, outcomes)
@@ -137,6 +155,9 @@ module NeonCovenant
         'choices' => Array(output['choices']).first(4).map { |c| c.to_s[0, 130] }
       }
       room['memory'] = output.fetch('world_note').to_s[0, 1700]
+      if TacticalMap.sync_to_scene!(room)
+        room['events'] << event('map', "GRID SYNC // #{room['map']['location']} // sector map generated.")
+      end
       apply_effects!(room, output['outcomes']) unless opening
       room['events'] << event('gm', room['scene']['narration'], 'title' => room['scene']['title'])
       room['events'] = room['events'].last(100)
@@ -171,6 +192,7 @@ module NeonCovenant
           room['status'] = 'lobby' if room['status'] == 'starting'
           room['events'] << Game.event('system', 'A stalled GM transmission was reset. The host may retry.')
         end
+        TacticalMap.ensure!(room)
         result = yield(room)
         store[:room] = room unless readonly
         result

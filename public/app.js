@@ -2,7 +2,7 @@
 
 (() => {
   const $ = (id) => document.getElementById(id);
-  const app = { mode: 'create', role: 'netrunner', approach: 'hack', code: null, token: null, state: null, busy: false, filter: 'all', sceneKey: null, eventKey: null, toastTimer: null };
+  const app = { mode: 'create', role: 'netrunner', approach: 'hack', code: null, token: null, state: null, busy: false, quickBusy: false, filter: 'all', sceneKey: null, eventKey: null, mapKey: null, mapMode: 'move', terrain: 'wall', toastTimer: null };
   const ROLES = { netrunner: 'NETRUNNER', solo: 'SOLO', ghost: 'GHOST', techie: 'TECHIE', fixer: 'FIXER' };
   const MODE_LABELS = { create: 'INITIALIZE CAMPAIGN', join: 'LINK TO CREW' };
 
@@ -79,7 +79,7 @@
 
   function backToEntry() {
     app.code = null; app.token = null; app.state = null;
-    app.sceneKey = null; app.eventKey = null; app.busy = false;
+    app.sceneKey = null; app.eventKey = null; app.mapKey = null; app.mapMode = 'move'; app.busy = false; app.quickBusy = false;
     $('landing').hidden = false;
     $('game').hidden = true;
     $('scene-view').hidden = true;
@@ -175,6 +175,72 @@
     $('action-text').value = '';
   }
 
+  const TERRAIN_SYMBOL = { floor: '·', wall: '▥', cover: '▤', objective: '◇', hazard: '⚠' };
+
+  function mapCoords(x, y) { return `${String.fromCharCode(65 + x)}${y + 1}`; }
+
+  function drawMap(state) {
+    const map = state.map;
+    if (!map) return;
+    const me = state.players.find((p) => p.id === state.me);
+    if (!me?.host && app.mapMode === 'paint') app.mapMode = 'move';
+    const signature = `${map.location}/${map.revision}/${app.mapMode}/${app.terrain}/${me?.host}`;
+    $('map-edit').hidden = !me?.host;
+    $('map-reset').hidden = !me?.host;
+    $('map-palette').hidden = !me?.host || app.mapMode !== 'paint';
+    $('map-move').classList.toggle('active', app.mapMode === 'move');
+    $('map-edit').classList.toggle('active', app.mapMode === 'paint');
+    $('map-location').textContent = `SECTOR // ${map.location}`;
+    $('map-hint').textContent = app.mapMode === 'paint'
+      ? 'HOST EDITOR // Choose terrain above, then click a cell. Crew tokens cannot be enclosed by a new wall.'
+      : 'CLICK A TILE TO MOVE // 4 orthogonal squares per click. Walls and occupied cells block the route. Movement is a visual aid, not a narrative action.';
+    document.querySelectorAll('[data-terrain]').forEach((button) => button.classList.toggle('active', button.dataset.terrain === app.terrain));
+    if (app.mapKey === signature) return;
+    app.mapKey = signature;
+    const holder = $('map-grid');
+    const frag = document.createDocumentFragment();
+    frag.append(el('span', 'map-axis', '◤'));
+    for (let x = 0; x < map.width; x++) frag.append(el('span', 'map-axis', String.fromCharCode(65 + x)));
+    for (let y = 0; y < map.height; y++) {
+      frag.append(el('span', 'map-axis', String(y + 1).padStart(2, '0')));
+      for (let x = 0; x < map.width; x++) {
+        const terrain = map.tiles[y * map.width + x] || 'floor';
+        const idx = state.players.findIndex((p) => {
+          const pos = map.positions[p.id];
+          return pos && pos.x === x && pos.y === y;
+        });
+        const occupiedBy = idx >= 0 ? state.players[idx] : null;
+        const cell = el('button', `map-cell terrain-${terrain}${idx >= 0 ? ` token-${idx + 1}` : ''}${occupiedBy?.id === state.me ? ' is-me' : ''}`);
+        cell.type = 'button';
+        cell.dataset.x = String(x);
+        cell.dataset.y = String(y);
+        const coordinate = mapCoords(x, y);
+        const detail = `${coordinate} · ${terrain.toUpperCase()}${occupiedBy ? ` · ${occupiedBy.name}` : ''}`;
+        cell.title = detail;
+        cell.setAttribute('aria-label', detail);
+        cell.append(el('span', 'map-glyph', TERRAIN_SYMBOL[terrain] || '·'));
+        if (occupiedBy) cell.append(el('span', 'map-token', String(idx + 1)));
+        frag.append(cell);
+      }
+    }
+    holder.replaceChildren(frag);
+    const roster = document.createDocumentFragment();
+    state.players.forEach((player, n) => {
+      const entry = el('span', 'map-party-member');
+      entry.append(el('span', `map-party-marker token-${n + 1}`, String(n + 1)),
+        el('span', '', `${player.name}${player.id === state.me ? ' [YOU]' : ''}`));
+      roster.append(entry);
+    });
+    $('map-party').replaceChildren(roster);
+  }
+
+  function drawLastRoll(state) {
+    const last = [...state.events].reverse().find((event) => event.kind === 'roll' && event.manual);
+    $('last-roll').textContent = last
+      ? `LAST ROLL // ${last.dice.join(' + ')} = ${last.total}`
+      : 'NO MANUAL ROLLS LOGGED';
+  }
+
   function drawEvents(state) {
     const signature = `${app.filter}:` + state.events.map((e) => e.id).join(',');
     if (signature === app.eventKey) return;
@@ -218,6 +284,12 @@
     $('force-resolve').hidden = !active || !player?.host || state.actions.length === 0 || locked || state.actions.length === state.players.length;
     $('sim-status').textContent = state?.pending ? '◌ GENERATING WORLD…' : active ? '● SIMULATION LIVE' : '● GM STANDBY';
     $('session-indicator').textContent = locked ? '◌ PROCESSING' : '● CONNECTED';
+    $('map-grid').querySelectorAll('.map-cell').forEach((cell) => { cell.disabled = !state || !!state.pending || app.quickBusy; });
+    $('map-move').disabled = !state || !!state.pending || app.quickBusy;
+    $('map-edit').disabled = !state || !!state.pending || app.quickBusy;
+    $('map-reset').disabled = !state || !!state.pending || app.quickBusy;
+    document.querySelectorAll('[data-terrain]').forEach((button) => { button.disabled = !state || !!state.pending || app.quickBusy; });
+    $('roll-dice').disabled = !state || app.quickBusy;
     $('send-chat').disabled = !state || app.busy;
     $('chat-input').disabled = !state || app.busy;
   }
@@ -229,7 +301,7 @@
     $('sector').textContent = state.scene?.location || 'MERIDIAN-9';
     $('round-number').textContent = String(state.round).padStart(2, '0');
     $('alert-level').textContent = state.scene?.threat || 'UNDETECTED';
-    drawRoster(state); drawStats(state); drawScene(state); drawEvents(state); renderControls();
+    drawRoster(state); drawStats(state); drawScene(state); drawMap(state); drawEvents(state); drawLastRoll(state); renderControls();
   }
 
   async function refresh() {
@@ -259,6 +331,52 @@
       toast(err.message, true);
       await refresh();
     } finally { setBusy(false); }
+  }
+
+  async function quickOperation(route, payload = {}) {
+    if (app.quickBusy || !app.code) return false;
+    app.quickBusy = true;
+    renderControls();
+    try {
+      const state = await api(`/api/rooms/${app.code}/${route}`, 'POST', payload);
+      updateState(state);
+      return true;
+    } catch (error) {
+      toast(error.message, true);
+      await refresh();
+      return false;
+    } finally {
+      app.quickBusy = false;
+      renderControls();
+    }
+  }
+
+  function selectMapMode(mode) {
+    const me = app.state?.players.find((player) => player.id === app.state.me);
+    if (mode === 'paint' && !me?.host) return;
+    app.mapMode = mode;
+    app.mapKey = null;
+    if (app.state) drawMap(app.state);
+    renderControls();
+  }
+
+  async function gridClick(event) {
+    const button = event.target.closest('button.map-cell');
+    if (!button || !app.state || app.state.pending) return;
+    const x = Number(button.dataset.x), y = Number(button.dataset.y);
+    if (app.mapMode === 'paint') {
+      await quickOperation('map/paint', { x, y, terrain: app.terrain });
+    } else {
+      await quickOperation('map/move', { x, y });
+    }
+  }
+
+  async function manualRoll() {
+    if (!app.state) return;
+    const payload = { count: Number($('roll-count').value), sides: Number($('roll-sides').value),
+      modifier: Number($('roll-mod').value), reason: $('roll-reason').value.trim() };
+    const ok = await quickOperation('roll', payload);
+    if (ok) $('roll-reason').value = '';
   }
 
   async function sendChat() {
@@ -312,6 +430,27 @@
     }));
     $('chat-input').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); sendChat(); } });
     $('send-chat').addEventListener('click', sendChat);
+    $('map-grid').addEventListener('click', gridClick);
+    $('map-move').addEventListener('click', () => selectMapMode('move'));
+    $('map-edit').addEventListener('click', () => selectMapMode('paint'));
+    $('map-reset').addEventListener('click', () => {
+      if (window.confirm('Regenerate this sector grid? All painted terrain and current token positions will be reset.')) quickOperation('map/reset');
+    });
+    document.querySelectorAll('[data-terrain]').forEach((button) => button.addEventListener('click', () => {
+      app.terrain = button.dataset.terrain;
+      app.mapKey = null;
+      if (app.state) drawMap(app.state);
+    }));
+    document.querySelectorAll('[data-preset]').forEach((button) => button.addEventListener('click', () => {
+      const [count, sides, mod] = button.dataset.preset.split(',').map(Number);
+      $('roll-count').value = String(count);
+      $('roll-sides').value = String(sides);
+      $('roll-mod').value = String(mod);
+    }));
+    $('roll-dice').addEventListener('click', manualRoll);
+    $('roll-reason').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') { event.preventDefault(); manualRoll(); }
+    });
     $('copy-room').addEventListener('click', copyInvite);
     $('exit-room').addEventListener('click', disconnect);
     const fromUrl = new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
