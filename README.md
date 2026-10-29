@@ -1,137 +1,188 @@
-# NEON//COVENANT
+# NEON//COVENANT — GEMINI//LINK (Violet TUI + Tactical Grid)
 
-**A browser-based, 1–5 player cyberpunk tabletop RPG built with Ruby + Sinatra, with an AI Game Master and CRT/TUI interface.**
+A self-hosted, **1–5 player cyberpunk tabletop RPG**, now with a shared grid and manual dice, written in Ruby/Sinatra, with Gemini as the AI Game Master (SWITCH//ZERO). The violet/cyan/black CRT terminal interface, dice mechanics, characters, and campaign-save format are preserved from the previous Groq and Qwen editions.
 
-- **Multiplayer rooms:** 8-character invite code, up to five total players, each on their own device/browser. The host starts the story and can advance a round when somebody is absent.
-- **Storyteller:** Google Gemini Interactions API, with JSON-schema scene results, scene memory, consequences, cinematic descriptions, suggested moves, and narrative continuity.
-- **Tabletop rules:** Choose Netrunner, Solo, Ghost, Techie, or Fixer. Submit any action with an approach; the server rolls **2d6 + relevant stat** against a fixed difficulty. The GM must accept the rolled result.
-- **Shared world:** Character HP, stress, credits, loadouts, chat, events, rounds, and scenes survive restarts using Ruby's built-in `PStore` (no database installation required).
-- **Terminal aesthetic:** Green-on-black CRT interface, violet/amber highlights, mission HUD, crew health bars, in-world text, datastream, and responsive mobile layout.
-- **Demo mode:** A scripted GM lets you explore the interface and mechanics without using paid API credits.
+## What is inside
 
-## Requirements
+- Private 8-character campaign codes, host controls, lobby, crew chat and five archetypes (Netrunner, Solo, Ghost, Techie, Fixer).
+- Server-generated 2d6 + attribute rolls (not chosen or edited by Gemini).
+- Persistent world memory, narrative choices, gear, hit points, stress and credits, with bounded AI-generated effects.
+- **NEW: Interactive 14×9 tactical grid** with numbered player tokens, live movement, map tiles and host terrain editing.
+- **NEW: Manual D4/D6/D8/D10/D12/D20/D100 rolls**, broadcast to the crew without consuming an AI turn.
+- Gemini REST `generateContent` integration with structured JSON output and server-only credentials; no Python/Node AI package needed.
+- Default **`gemini-3.5-flash-lite`**, which Google lists with free-tier text input and output, subject to account, regional and rate limits. To try richer scenes, use `gemini-3.8-flash` if your account permits it. Availability and fees can change; check https://ai.google.dev/gemini-api/docs/pricing.
+- `DEMO_MODE=true` for local scripted play with **zero AI API requests**.
 
-Ruby **3.2+** (3.3 recommended), Bundler, and internet access for `bundle install` and AI calls. `Gemfile` installs Sinatra, Puma, and Dotenv.
+## 1 — Install on Kali Linux
 
-> **Gemini API key ≠ a Google account password or Gemini app subscription.** Obtain a key in [Google AI Studio](https://aistudio.google.com/apikey). Gemini API usage has its own quotas and billing. **Never enter your API key in the browser or share it with players.** It stays in the server's environment.
-
-## Run locally
+From the extracted `neon_covenant_gemini_final` directory:
 
 ```bash
-cd neon_covenant
-gem install bundler
+sudo apt update
+sudo apt install -y ruby ruby-dev build-essential bundler
+bundle config set --local path 'vendor/bundle'
 bundle install
 cp .env.example .env
-# Edit .env: add GEMINI_API_KEY=your_key (or DEMO_MODE=true for an offline demo)
+nano .env
 bundle exec ruby app.rb
 ```
 
-On Windows PowerShell, replace `cp` with `Copy-Item .env.example .env`, then edit `.env` in Notepad. Install Ruby through RubyInstaller first if it isn't available.
+Open <http://127.0.0.1:4567>. Avoid `sudo bundle install`; your previous permission error came from Bundler writing to system gem folders. The `Gemfile` includes `rackup` and `puma` for Sinatra 4.
 
-Open **http://127.0.0.1:4567**. The server listens only on localhost by default. For a LAN/public deployment, configure the bind address and reverse proxy appropriately.
+If your Kali `bundle` executable isn't found, install bundler in your user gem directory and ensure that directory is on `PATH`, or install the `bundler` Debian package as above.
 
-### Minimal `.env`
+## 2 — Configure your Gemini API key
+
+Create an API key at <https://aistudio.google.com/apikey>. Place it **only in `.env` on the Sinatra server**:
 
 ```dotenv
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-3.8-flash
+GEMINI_MODEL=gemini-3.5-flash-lite
 DEMO_MODE=false
+APP_HOSTS=
 PORT=4567
+RACK_ENV=development
 ```
 
-Use a model your account has access to. The default model is Gemini 3.8 Flash; adjust it to a model available to your key. The GM relies on structured JSON output.
+Restart Sinatra when updating `.env`. For potentially richer narration, try `GEMINI_MODEL=gemini-3.8-flash`, which may have different free-tier availability or limits. Do **not** add the API key to `public/app.js`, `public/index.html`, a Git commit or a chat message.
 
-**To test without an API key:** set `DEMO_MODE=true`, then restart the server. The demo story is scripted, not Gemini-driven, but it honors your actions and dice.
+The GM uses Google's HTTPS REST endpoint `POST /v1beta/models/{model}:generateContent` with an `x-goog-api-key` header, `systemInstruction`, and `generationConfig.responseFormat.text` structured JSON schema. Campaign context is sent per request and stored locally between rounds (no Gemini conversation store required).
 
-**Upgrading from the OpenAI edition:** replace `OPENAI_API_KEY`/`OPENAI_MODEL` in your `.env` with `GEMINI_API_KEY`/`GEMINI_MODEL`, then restart Sinatra (or `docker compose up --build -d`). Existing room saves in `data/rooms/` use the same format. There is no OpenAI dependency in this edition.
+## 3 — Upgrade an existing NEON//COVENANT Groq/Qwen/Gemini install
 
-**Model option:** If you want to try a lower-cost model, change `GEMINI_MODEL` to `gemini-3.5-flash-lite` (subject to your account's availability). Google AI Studio controls API usage and quotas; a Gemini app subscription does not supply an API key.
+1. Stop the running server and **back up both `.env` and `data/rooms/`**.
+2. Extract this ZIP to a separate folder. Copy its **`app.rb`, `lib/`, `public/`, `Gemfile`, `config.ru`, `test/`** into `~/NEON-Convenant`, keeping the original `.env` and `data/rooms/` intact. Copy `.env.example` only for reference.
+3. Edit `~/NEON-Convenant/.env`: set `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.5-flash-lite`, and `DEMO_MODE=false`. Remove old `GROQ_*` or `QWEN_*` variables if convenient, but they are not read by this edition.
+4. Reinstall to the local bundle and start:
 
-## Docker / local-home-server deployment
+   ```bash
+   cd ~/NEON-Convenant
+   bundle config set --local path vendor/bundle
+   bundle install
+   bundle exec ruby app.rb
+   ```
+
+5. Hard-refresh the UI with `Ctrl+Shift+R`. The project does not change the game-state schema; existing rooms **should remain compatible**. A backup is still important.
+
+**Note:** A `.env` from Groq with only `GROQ_API_KEY` will not authorize Gemini. The server should report `"gm_mode":"gemini"` at `/health` when its Gemini key is configured, `"demo"` in demo mode, or `"unconfigured"` without credentials.
+
+## 4 — How to play
+
+Create a room as host and share its code with up to four friends. Select your class and campaign tone. The host starts the session, prompting Gemini to narrate the opener. Each player describes freeform actions using HACK, FORCE, STEALTH, TALK or INVESTIGATE. The server rolls 2d6, then Gemini narrates successes, failures, encounters and consequences. After everyone submits, the GM automatically advances, or the host can advance when some players are away.
+
+Each campaign start and resolved round makes **one** Gemini API request; room browsing, chat, and entering actions do not. Quota errors produce a visible message and leave already submitted actions intact so the host can retry. Some free accounts can encounter daily or per-minute limits.
+
+For offline demo play, set `DEMO_MODE=true` (no API key needed).
+
+## 5 — Self-hosting / Cloudflare Tunnel
+
+Docker is also supported:
 
 ```bash
 cp .env.example .env
-# Edit .env with your key and desired settings
+# Edit .env with GEMINI_API_KEY, APP_HOSTS=game.example.com, RACK_ENV=production
 docker compose up --build -d
 ```
 
-The Docker Compose configuration exposes port 4567 **only to the host's loopback interface** and persists games in `./data/rooms`. A Cloudflare Tunnel on the same home server can point to `http://127.0.0.1:4567`.
+Docker binds the host port to `127.0.0.1:4567`; a Cloudflare Tunnel on the host can proxy to <http://127.0.0.1:4567>. This is a prototype for a trusted crew rather than a hardened public service. Protect the tunnel and add stronger abuse protections before opening it to strangers.
 
-If you put the game behind a custom hostname, add that hostname (without `https://`) to `APP_HOSTS` in `.env`, for example `APP_HOSTS=game.example.com`, and restart the service. Sinatra's host authorization intentionally restricts unlisted domains. Configure HTTPS and access protection at your reverse proxy.
+## 6 — Validation
 
-## Play the game
-
-1. A player chooses an archetype and creates a campaign, selecting **Noir**, **Rebellion**, or **Ghost Signal**.
-2. They click **INVITE** and send the generated URL to up to four others. Each player enters a unique handle and role.
-3. The **host** clicks **BOOT THE CAMPAIGN** to create the opening AI-driven scene.
-4. Each player writes a freeform action and chooses HACK, FORCE, STEALTH, TALK, or INVESTIGATE. They can also click a suggested path to insert it into the action editor.
-5. The server rolls and locks the action. Once every current player has acted, the GM resolves the round automatically, describes outcomes, updates stats, and produces the next scene.
-6. If a player is absent, the host may choose **ADVANCE WITH SUBMITTED ACTIONS** to skip those who have not submitted that round.
-
-The GM call runs on the server. All connected browsers update by polling the room every ~2.6 seconds. The last person to act may see a generation delay as the GM prepares the next scene. In a one-person campaign, each submitted action immediately triggers the GM.
-
-### Dice and stats
-
-| Approach | Stat | Difficulty |
-|---|---|---:|
-| FORCE | EDGE | 9 |
-| STEALTH | GHOST | 9 |
-| HACK | TECH | 10 |
-| TALK | GHOST | 9 |
-| INVESTIGATE | TECH | 8 |
-
-Roll **2d6 + stat**. A result at least as high as the DC succeeds; otherwise the GM describes a cost, complication, or setback. A failed roll never automatically prevents the story from moving forward. The GM can award modest HP, stress, credit, or item changes, but the server caps each change and validates which player acted. These are deliberately lightweight, original game rules rather than a licensed TTRPG ruleset.
-
-## Project structure
-
-```text
-neon_covenant/
-├── app.rb               # Sinatra routes, player authentication, room state machine
-├── lib/
-│   ├── game.rb          # Characters, persistent room store, dice, bounded effects
-│   └── gm.rb            # Gemini Interactions API + structured GM + demo mode
-├── public/
-│   ├── index.html       # TUI / CRT interface
-│   ├── style.css        # Responsive visual system
-│   └── app.js           # API client, polling, browser UI
-├── test/game_test.rb    # Core-game tests (can run without installing gems)
-├── data/rooms/          # Auto-created PStore save files (gitignored)
-├── .env.example
-├── Dockerfile
-├── compose.yaml
-└── Gemfile
+```bash
+ruby test/game_test.rb
+ruby -c app.rb
+ruby -c lib/gm.rb
+node --check public/app.js  # optional
 ```
 
-## Test
+Automated tests cover character stats, PStore save/recovery, server rolls, secret handling, Gemini request shape and parsing, schema validation, missing keys, incomplete responses, and 429 retry information. **Mock tests cannot prove your API key has real working quota**; test a campaign start with your own key.
+
+## Project layout
+
+```text
+neon_covenant_gemini_final/
+├── app.rb                Sinatra routes & multiplayer game server
+├── lib/game.rb           Rules, secure player tokens, PStore, server dice
+├── lib/map.rb            Tactical grid, movement, terrain editing and map sync
+├── lib/gm.rb             Gemini REST API + demo GM
+├── public/index.html     Violet/cyan CRT interface
+├── public/style.css      CRT, TUI panels & scanline theme
+├── public/app.js         Multiplayer browser client
+├── test/game_test.rb     Offline unit tests
+├── Gemfile               Sinatra, Puma, Rackup, Dotenv
+├── .env.example          Key/model template (no secrets)
+├── Dockerfile
+└── compose.yaml
+```
+
+Official docs: [Generate Content API](https://ai.google.dev/api/generate-content), [Structured Output](https://ai.google.dev/gemini-api/docs/generate-content/structured-output), [Pricing](https://ai.google.dev/gemini-api/docs/pricing).
+
+---
+
+## 7 — NEW: Tactical grid (14 × 9)
+
+This edition adds a **shared, interactive tactical map** directly above the GM narration. It works in a browser; it is not a static image or third-party maps service.
+
+- **Player tokens:** Each operative appears as a numbered violet/cyan/pink/amber/green token. The roster below the grid identifies the token owner.
+- **Click-to-move:** Click a reachable tile to move **your own** token by up to **four orthogonal squares per click**. Walls and occupied cells block routes. Diagonal shortcuts are not allowed. Movement updates every crew member's map on the normal 2.6-second room polling interval, without using Gemini quota.
+- **Terrain types:** Floor (`·`), wall (`▥`, impassable), cover (`▤`), objective (`◇`), and hazard (`⚠`). Cover/hazard/objective tiles are visual cues; the AI GM and the players still adjudicate any combat effects.
+- **Host editor:** Click **HOST: EDIT**, select a tile type, and click grid cells to paint terrain. Non-host players cannot edit or reset terrain; the server checks authorization. The server also refuses to place walls underneath players. Click **MOVE** to return to movement mode.
+- **Regenerate (`↻`):** The host can recreate the sector grid from the current location. Regenerating removes hand-painted changes and resets every operative's position.
+- **Scene sync:** The grid automatically generates a new procedural sector when the GM reports a changed `location` in the scene. This will reset painted tiles and positions. The sector map is an **illustrative sketch**, not a detailed image of the location or a promise of precise line-of-sight rules.
+- **Lobby & saves:** The map is prepared from room creation, becomes visible in the active story view, and is saved in the same PStore room as the campaign. Older campaign files without a `map` field are automatically given a grid without modifying the characters or story.
+
+### Moving and editing
+
+Each cell has a coordinate such as **B5** or **N9**, with letters across the top and numbers down the left. To avoid blocked cells, select a nearby walkable cell first; you can move again after the prior move is saved. Movement is a visual positioning aid and **does not consume an action or trigger an AI scene**. It also does not automatically grant combat advantage or bypass story obstacles.
+
+### Dedicated map endpoints
+
+All routes require the same player bearer token used by other room actions. **Only host** can call paint and reset. The server checks map coordinates and terrain values rather than trusting browser input:
+
+```text
+POST /api/rooms/:code/map/move   {"x": 5, "y": 4}
+POST /api/rooms/:code/map/paint  {"x": 5, "y": 4, "terrain": "cover"}
+POST /api/rooms/:code/map/reset  {}
+```
+
+## 8 — NEW: Manual dice console
+
+Under **DATASTREAM**, there is a `DICE://MANUAL` panel. Set the number of dice **1–8**, sides **D4, D6, D8, D10, D12, D20 or D100**, and modifier **−20 to +20**, then optionally enter a reason (up to 80 characters). **ROLL TO DATASTREAM** rolls with Ruby's `SecureRandom` on the server and broadcasts the individual dice and total to the entire room.
+
+Three shortcuts are provided: **2D6**, **D20** and **D100**. You can see the last manual result beneath the roll button, and every roll appears under the shared **ROLLS** event filter.
+
+Manual dice **do not** trigger a Gemini request, don't consume an action, and don't automatically change character stats. The usual narrative action rolls (2D6 + class attribute vs difficulty) continue to run separately when a player commits an action.
+
+```text
+POST /api/rooms/:code/roll
+Authorization: Bearer <your-player-token>
+Content-Type: application/json
+
+{"count":2,"sides":6,"modifier":1,"reason":"Check the lock"}
+```
+
+## 9 — Upgrade to this grid edition
+
+**Recommended:** Extract the downloaded ZIP to a new directory first. From your existing `~/NEON-Convenant` installation, **back up `.env` and `data/rooms/` before copying files**. Copy `app.rb`, `lib/`, `public/`, `Gemfile`, and `test/` from the grid edition into your existing project. Leave the original `.env` and `data/rooms/` in place.
+
+```bash
+cd ~/NEON-Convenant
+bundle config set --local path vendor/bundle
+bundle install
+bundle exec ruby app.rb
+```
+
+Hard-refresh the browser (`Ctrl+Shift+R`). Your Gemini settings remain `GEMINI_API_KEY=...`, `GEMINI_MODEL=...`, and `DEMO_MODE=false` (or `true` for an offline demonstration).
+
+To run the expanded offline test suite:
 
 ```bash
 ruby test/game_test.rb
 ruby -c app.rb
 ruby -c lib/game.rb
+ruby -c lib/map.rb
 ruby -c lib/gm.rb
-node --check public/app.js   # optional if Node.js is installed
+node --check public/app.js
 ```
 
-These tests validate character creation, secret filtering, dice, effect caps, the offline GM, PStore persistence, and stalled GM recovery. **Live Gemini calls require a valid API key and are not exercised by these unit tests.**
-
-## Security / operational notes
-
-- Player bearer tokens are random and only their SHA-256 digests are stored server-side. Browsers keep their tokens in `localStorage` for reconnecting on refresh. **Protect the site with HTTPS**, because player sessions and room access matter.
-- The eight-character room code is an invite secret; it is **not** a substitute for user accounts. Anyone with the link may join before the campaign starts if a slot is free. There is no account recovery after disconnecting from a running game.
-- Persistent room files may include campaign content and player-submitted text. They are stored under `data/rooms/`; protect this directory and avoid exposing it as static content. `public/` is the only public static directory.
-- Never commit `.env`, API keys, room data, or logs. The supplied `.gitignore` and `.dockerignore` omit them.
-- For exposure to strangers on the internet, add **reverse-proxy rate limiting, user accounts/access controls, abuse moderation, backups, and resource quotas** before making it generally available. The supplied project is a playable self-hosted MVP, not a hardened public MMO service.
-- If the API times out or fails, the current submitted actions remain available so the host can retry the round. After a process crash, stale GM locks are cleared automatically after three minutes of subsequent room access.
-- `GEMINI_MODEL` is configurable. The assistant's narrative is treated as untrusted input: the server owns rolls, validates player IDs, caps effects, and never evaluates generated code.
-
-## API
-
-`POST /api/rooms` create; `POST /api/rooms/:code/join` join; `GET /api/rooms/:code` snapshot; `POST /api/rooms/:code/start` boot; `POST /api/rooms/:code/action` submit move; `POST /api/rooms/:code/resolve` host advance; `POST /api/rooms/:code/chat` message; `POST /api/rooms/:code/leave` disconnect; `GET /health` readiness. Authenticated routes use `Authorization: Bearer <player_token>`. JSON POST requests use `Content-Type: application/json`.
-
-## Official API reference
-
-- [Gemini Interactions API](https://ai.google.dev/gemini-api/docs/interactions-overview)
-- [Gemini structured outputs](https://ai.google.dev/gemini-api/docs/structured-output)
-- [Gemini API keys](https://ai.google.dev/gemini-api/docs/api-key)
-
-Original concept and assets created as an independent cyberpunk-inspired project.
+**Testing status:** 22 offline Ruby tests and 718 assertions passed before packaging. All syntax checks passed. The live Sinatra/Gemini integration and a visual browser walkthrough require verification on your Kali host; no real API key is included.
