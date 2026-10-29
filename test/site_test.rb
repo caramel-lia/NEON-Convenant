@@ -47,4 +47,28 @@ class WebsiteTest < Minitest::Test
       assert_includes html, element
     end
   end
+  def test_action_roll_requires_explicit_button_press
+    routes = read('app.rb')
+    client = read('public/app.js')
+    html = read('public/play.html')
+    rules = read('lib/game.rb')
+    assert_includes routes, "post '/api/rooms/:code/action/roll'"
+    assert_includes routes, 'Game.prepare_action(player, body'
+    assert_includes routes, 'Game.roll_pending_action!(player, action)'
+    assert_includes routes, "room['actions'].any? { |a| !a['roll'] }"
+    assert_includes client, "$('roll-required').addEventListener('click', rollRequired)"
+    assert_includes client, "app.state?.actions.find"
+    assert_includes html, 'id="action-roll-overlay"'
+    assert_includes html, 'id="roll-required"'
+    refute_includes rules, 'def roll_action('
+  end
+
+  def test_map_has_resize_observer_and_fluid_layout
+    client = read('public/app.js')
+    css = read('public/style.css')
+    assert_includes client, 'new ResizeObserver(resizeMap)'
+    assert_includes css, '--cell-size-live'
+    assert_includes css, 'grid-template-columns:20px repeat(var(--map-column-count), var(--cell-size-live))'
+  end
+
 end

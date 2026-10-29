@@ -1,6 +1,20 @@
-# NEON//COVENANT — Meridian-9 Website Edition
+# NEON//COVENANT — Adaptive Map + Manual D20 Edition
 
-A complete **Ruby + Sinatra cyberpunk tabletop RPG website** with a proper public homepage and a separate playable multiplayer client. Designed in a dark violet/cyan cyberpunk TUI style.
+A complete **Ruby + Sinatra cyberpunk tabletop RPG website** with a public landing page, a full-width adaptive tactical grid, and an enforced **commit → manually roll ONE D20 → Gemini resolves** action sequence. Designed in a dark violet/cyan cyberpunk TUI style.
+
+## NEW: action flow (important)
+
+1. The player chooses an approach and writes an intent, then presses **COMMIT ACTION**.
+2. The server saves the action as **unrolled**. No dice are rolled and no Gemini call occurs yet.
+3. An accessible, high-visibility **ROLL 1D20 NOW** prompt opens for the committing player. Other controls cannot bypass this requirement.
+4. The player **clicks the roll button**; the server generates exactly one D20 and adds the approach stat. This result is persisted, displayed in the datastream, and protected against duplicate rolls.
+5. Gemini **cannot** resolve any round containing an unrolled committed action. It proceeds after every participating player rolls; if a crew member has not acted, the host can advance with currently rolled actions only.
+
+The independent **DICE://MANUAL** roller remains available for optional tabletop rolls but **does not count** toward a committed action. No dice are rolled automatically on action submission. Old save files containing fully rolled actions remain usable.
+
+## NEW: responsive tactical map
+
+The same real, server-synced **14×9 grid** is shown at the **top of the game console** as well as in the lobby. A ResizeObserver automatically fits 14 columns and their row/column labels into the available panel, including mobile widths. Movement, terrain editing, and crew markers continue to use the saved game state. All interface changes are CSS and JavaScript; no external map provider or API key is required.
 
 ## What's new
 
@@ -87,7 +101,7 @@ Production exposure requires additional protections. This is a **self-hosted mul
 - Roles: Netrunner, Solo, Ghost, Techie, Fixer
 - Three campaign themes: Noir, Rebellion, Ghost Signal
 - Gemini game master creates scenes and consequences; Ruby controls dice and validated effects
-- 2D6 + stat versus DC 10 for committed actions; manual D4/D6/D8/D10/D12/D20/D100 for ad hoc rolls
+- Two-phase manual resolution: submit intent → player explicitly rolls exactly one D20 (+ stat) against DC 13–15; Gemini never advances with an unrolled action. Additional D4/D6/D8/D10/D12/D20/D100 rolls are for independent tabletop use
 - Shared **14 × 9** grid with moveable player tokens, walls, cover, objectives, and hazards; host terrain editor
 - Room and progress persistence in `data/rooms/` with browser-local bearer session tokens
 - Shared event feed, crew chat, invite links and host-initiated round resolution
@@ -95,7 +109,7 @@ Production exposure requires additional protections. This is a **self-hosted mul
 ## File structure
 
 ```text
-neon_covenant_full_site/
+neon_covenant_d20_map/
 ├── app.rb                      # Sinatra game API, website routes, custom 404
 ├── Gemfile                     # Sinatra, Rackup, Puma, dotenv
 ├── .env.example                # Environment variable template
@@ -124,7 +138,7 @@ ruby test/game_test.rb
 ruby test/site_test.rb
 ```
 
-Both the existing game tests and new website structure tests run without a live API key. A real Gemini narration turn needs a configured API key, and a live deployment still needs end-to-end testing on your server.
+Both the existing game tests and new website structure tests run without a live API key. An interactive Chromium browser smoke test (with simulated backend data) additionally checked creation, map visibility, manual D20 gating, and phone/desktop widths. A real Gemini narration turn needs a configured API key, and a live deployment still needs end-to-end testing on your server.
 
 ## Limitations
 

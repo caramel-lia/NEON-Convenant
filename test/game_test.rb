@@ -30,19 +30,48 @@ class GameTest < Minitest::Test
     assert_equal 5, state['max_players']
   end
 
-  def test_actions_use_real_server_dice_and_fixed_dc
+  def test_action_commit_never_rolls_automatically
+    action = Game.prepare_action(@player, 'hack', 'Crack the gate firmware')
+    assert_nil action['roll']
+    assert_equal 'hack', action['approach']
+    assert_equal 'Crack the gate firmware', action['intent']
+    @room['actions'] << action
+    state = Game.public_state(@room, player_id: @player['id'])
+    assert_nil state['actions'][0]['roll']
+    refute state['players'][0]['ready']
+    assert_raises(GameError) { Game.prepare_action(@player, 'teleport', 'warp') }
+  end
+
+  def test_single_d20_can_only_be_rolled_once_for_committed_action
     50.times do
-      action = Game.roll_action(@player, 'hack', 'Crack the gate firmware')
-      assert action['roll']['dice'].all? { |v| (1..6).cover?(v) }
-      assert_equal action['roll']['dice'].sum + 3, action['roll']['total']
-      assert_equal 10, action['roll']['difficulty']
-      assert_equal(action['roll']['total'] >= 10, action['roll']['success'])
+      action = Game.prepare_action(@player, 'hack', 'Crack the gate firmware')
+      roll = Game.roll_pending_action!(@player, action)
+      assert_equal 1, roll['dice'].length
+      assert roll['dice'].first.between?(1, 20)
+      assert_equal roll['dice'][0] + 3, roll['total']
+      assert_equal 15, roll['difficulty']
+      assert_equal(roll['total'] >= 15, roll['success'])
+      assert_raises(GameError) { Game.roll_pending_action!(@player, action) }
     end
-    assert_raises(GameError) { Game.roll_action(@player, 'teleport', 'warp') }
+    other, = Game.new_player(name: 'Somebody', role: 'solo')
+    action = Game.prepare_action(@player, 'force', 'Force door')
+    assert_raises(GameError) { Game.roll_pending_action!(other, action) }
+    assert_raises(GameError) { Game.roll_pending_action!(@player, nil) }
+  end
+
+  def test_manual_roll_does_not_unblock_committed_action
+    action = Game.prepare_action(@player, 'stealth', 'Sneak through the checkpoint')
+    @room['actions'] << action
+    3.times { Game.manual_roll(@player, count: 1, sides: 20, modifier: 0) }
+    assert_nil action['roll']
+    refute Game.public_state(@room, player_id: @player['id'])['players'][0]['ready']
+    Game.roll_pending_action!(@player, action)
+    assert Game.public_state(@room, player_id: @player['id'])['players'][0]['ready']
   end
 
   def test_ai_effects_cannot_become_arbitrary_stats
-    a = Game.roll_action(@player, 'hack', 'Find the courier')
+    a = Game.prepare_action(@player, 'hack', 'Find the courier')
+    Game.roll_pending_action!(@player, a)
     @room['actions'] << a
     Game.apply_effects!(@room, [
       { 'player_id' => @player['id'], 'hp_delta' => -9999, 'stress_delta' => 100, 'credits_delta' => 99_999, 'item_award' => 'Quantum token' },
@@ -61,7 +90,9 @@ class GameTest < Minitest::Test
     initial = gm.generate(@room, opening: true)
     Game.update_scene!(@room, initial, opening: true)
     assert_equal 'THE CITY THAT NEVER BLINKS', @room.dig('scene', 'title')
-    @room['actions'] << Game.roll_action(@player, 'hack', 'Decode the case')
+    a = Game.prepare_action(@player, 'hack', 'Decode the case')
+    Game.roll_pending_action!(@player, a)
+    @room['actions'] << a
     scene = gm.generate(@room, opening: false)
     Game.update_scene!(@room, scene)
     assert_includes @room.dig('scene', 'narration'), 'NullByte'

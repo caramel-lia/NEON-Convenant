@@ -19,6 +19,8 @@ module NeonCovenant
       for them. Manual table dice are player tools, not authoritative action rolls. Introduce recurring relationships,
       mysteries, clues, and consequences. Progress the fiction every round; don't stall.
       Never make the players' decisions for them. Do not railroad; use the actual actions.
+      Each action is committed first, then its player explicitly triggers a single D20 roll.
+      A rolled action uses 1D20 + the character stat against DC 13–15.
       All dice rolls and success flags are authoritative, calculated by the game server.
       Explicitly narrate success/failure and complications based on these rolls.
       A failure must move the story forward, possibly with a cost.

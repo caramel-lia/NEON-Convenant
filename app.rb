@@ -75,6 +75,7 @@ module NeonCovenant
           else
             raise GameError.new('Campaign has not started.', 409) unless room['status'] == 'active'
             raise GameError.new('At least one action is required.', 409) if room['actions'].empty?
+            raise GameError.new('A player still needs to roll their d20.', 409) if room['actions'].any? { |a| !a['roll'] }
           end
           room['pending'] = true
           room['pending_at'] = Time.now.utc.iso8601
@@ -175,23 +176,41 @@ module NeonCovenant
       output(state)
     end
 
+    # Phase 1: commit the character's intent, without rolling or contacting Gemini.
     post '/api/rooms/:code/action' do
       body = json_body
       code = params[:code].upcase
-      auto_resolve = STORE.with_room(code) do |room|
+      state = STORE.with_room(code) do |room|
         player = authenticate!(room)
         raise GameError.new('Wait for the GM to finish.', 409) if room['pending']
         raise GameError.new('Campaign has not started.', 409) unless room['status'] == 'active'
-        raise GameError.new('You already acted this round.', 409) if room['actions'].any? { |a| a['player_id'] == player['id'] }
-        action = Game.roll_action(player, body['approach'], body['intent'])
+        raise GameError.new('You already submitted an action this round.', 409) if room['actions'].any? { |a| a['player_id'] == player['id'] }
+        action = Game.prepare_action(player, body['approach'], body['intent'])
         room['actions'] << action
-        r = action['roll']
-        room['events'] << Game.event('roll', "#{player['name']} / #{body['approach'].upcase} → #{r['dice'].join('+')} + #{r['bonus']} = #{r['total']} vs DC #{r['difficulty']} // #{r['success'] ? 'SUCCESS' : 'FAILURE'}", 'player_id' => player['id'])
+        room['events'] << Game.event('action', "#{player['name']} committed an action and must roll 1D20 before it can resolve.", 'player_id' => player['id'])
+        room['events'] = room['events'].last(100)
+        Game.public_state(room, player_id: player['id'])
+      end
+      output(state)
+    end
+
+    # Phase 2: ONLY an explicit click on the player's 1D20 button rolls the die.
+    # A separate manual tabletop roller never satisfies this mandatory roll.
+    post '/api/rooms/:code/action/roll' do
+      code = params[:code].upcase
+      should_resolve = STORE.with_room(code) do |room|
+        player = authenticate!(room)
+        raise GameError.new('Wait for the GM to finish.', 409) if room['pending']
+        raise GameError.new('Campaign has not started.', 409) unless room['status'] == 'active'
+        action = room['actions'].find { |a| a['player_id'] == player['id'] }
+        roll = Game.roll_pending_action!(player, action)
+        room['events'] << Game.event('roll', "#{player['name']} / #{action['approach'].upcase} → D20 [#{roll['dice'][0]}] + #{roll['bonus']} = #{roll['total']} vs DC #{roll['difficulty']} // #{roll['success'] ? 'SUCCESS' : 'FAILURE'}", 'player_id' => player['id'], 'action_roll' => true, 'dice' => roll['dice'], 'total' => roll['total'])
         room['events'] << Game.event('action', "#{player['name']}: #{action['intent']}", 'player_id' => player['id'])
         room['events'] = room['events'].last(100)
-        room['actions'].length == room['players'].length
+        room['actions'].length == room['players'].length && room['actions'].all? { |a| a['roll'] }
       end
-      resolve_gm!(code) if auto_resolve
+      # The next scene may advance only after every participating player has rolled.
+      resolve_gm!(code) if should_resolve
       state = STORE.with_room(code, readonly: true) { |room| game_state(room) }
       output(state)
     end

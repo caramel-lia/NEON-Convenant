@@ -55,3 +55,105 @@
 .landing-top,.game-bar{gap:10px}
 .landing-footer a{color:var(--cyan);text-decoration:none}
 @media(max-width:750px){.play-guide{display:none}.play-home{font-size:8px;padding:5px}.landing-top{gap:4px}}
+
+/* UI v2.1 // fluid tactical viewport and explicit single-D20 action gate */
+.game { height:auto; min-height:100svh; padding-inline:clamp(10px,1.7vw,26px); overflow:visible; }
+.game-layout { flex:1 0 auto; display:grid; grid-template-columns:minmax(190px,240px) minmax(0,1fr) minmax(230px,290px); align-items:start; gap:clamp(9px,1.2vw,18px); }
+.game-layout > .pane { min-width:0; max-width:100%; border-radius:3px; }
+.game-layout .roster { grid-column:auto; grid-row:auto; }
+.game-layout .story { grid-column:auto; grid-row:auto; min-height:0; }
+.game-layout .transmissions { grid-column:auto; grid-row:auto; min-height:0; max-height:none; }
+.story #scene-view { display:flex; flex-direction:column; min-height:0; flex:1; }
+.story-content { overflow:visible; flex:initial; padding:clamp(12px,1.6vw,24px); min-width:0; }
+.story { overflow:visible; }
+.story-kicker { margin-top:22px; margin-bottom:9px; }
+.story h2 { margin-bottom:14px; font-size:clamp(24px,2.6vw,40px); }
+.scene-map-anchor { min-width:0; width:100%; }
+.tactical-panel { margin:0 0 14px; padding:clamp(9px,1vw,14px); width:100%; min-width:0; border-color:#8260ac; }
+.map-grid-scroll { overflow-x:hidden; width:100%; max-width:100%; min-width:0; scrollbar-width:none; }
+.map-grid {
+  --cell-size-live:26px; --map-column-count:14; --map-row-count:9;
+  display:grid; width:max-content!important; max-width:100%!important; min-width:0!important;
+  margin:0 auto; gap:2px;
+  grid-template-columns:20px repeat(var(--map-column-count), var(--cell-size-live))!important;
+  grid-template-rows:17px repeat(var(--map-row-count), var(--cell-size-live))!important;
+}
+.map-grid .map-cell { width:var(--cell-size-live); height:var(--cell-size-live); aspect-ratio:auto; font-size:clamp(9px,1.3vw,14px); touch-action:manipulation; }
+.map-grid .map-token { font-size:clamp(9px,1.4vw,17px); }
+.map-axis { font-size:clamp(7px,.7vw,10px); }
+.map-party { align-items:center; margin-top:12px; }
+.action-console { position:relative; padding:clamp(12px,1.4vw,19px); }
+.rules-hint { font-size:10px; line-height:1.6; }
+#lobby-view { overflow:visible; padding:clamp(12px,2vw,26px); }
+#lobby-view:has(#tactical-map) .map-grid {
+  grid-template-columns:20px repeat(var(--map-column-count), var(--cell-size-live))!important;
+  grid-template-rows:17px repeat(var(--map-row-count), var(--cell-size-live))!important;
+}
+#lobby-view #lobby-grid-anchor { margin:16px auto; width:100%; max-width:none; }
+#lobby-view:has(#tactical-map) #lobby-grid-anchor { max-width:none; }
+#lobby-view .tactical-panel { text-align:left; }
+#lobby-view .map-party { justify-content:center; }
+#lobby-view #start-game { margin:12px 0; min-height:48px; }
+
+/* The action gate is not a cosmetic roll: server persists an unrolled action
+   and refuses to call Gemini until /action/roll explicitly succeeds. */
+.action-roll-overlay {
+ position:fixed; inset:0; z-index:1100; padding:clamp(12px,3vw,35px);
+ display:flex; align-items:center; justify-content:center; overflow:auto;
+ background:rgba(3,3,12,.87); backdrop-filter:blur(9px);
+}
+.action-roll-dialog { width:min(760px,100%); max-height:calc(100svh - 26px); overflow:auto;
+ background:linear-gradient(145deg,#1e1434,#0c0b1b 75%); color:#f4edff;
+ border:1px solid #a17ad2; box-shadow:0 0 0 1px #3c2a59, 0 25px 130px #000b, 0 0 70px #9253cd33;
+}
+.roll-dialog-top { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 20px;
+ border-bottom:1px solid #5b467c; background:#1a1230; color:var(--cyan); font-weight:900; font-size:10px; letter-spacing:1px; }
+.roll-dialog-top span:last-child { color:var(--violet); }
+.roll-dialog-content { display:grid; grid-template-columns:minmax(140px,210px) minmax(0,1fr); gap:clamp(15px,2.6vw,30px); align-items:center; padding:clamp(18px,3vw,34px); }
+.roll-die-symbol { display:grid; place-items:center; width:min(100%,200px); aspect-ratio:1;
+ color:var(--cyan); font:900 clamp(45px,6vw,88px)/1 Impact,system-ui,sans-serif;
+ background:radial-gradient(circle at center,#21183b 0 35%,#120e27 36% 58%,transparent 59%);
+ border:2px solid #8e72c5; clip-path:polygon(50% 0, 92% 28%, 100% 77%,50% 100%,0 77%,8% 28%);
+ filter:drop-shadow(0 0 20px #9b78ef70); }
+.roll-step { font-size:10px; color:var(--cyan); letter-spacing:1.3px; font-weight:900; }
+.roll-info h2 { font:900 clamp(27px,4vw,46px)/1.09 Impact,'Arial Narrow',system-ui,sans-serif; margin:10px 0 12px; letter-spacing:.6px; }
+.roll-info h2 em { color:var(--violet); font-style:normal; }
+.roll-info p { font-size:12px; color:#c7bada; line-height:1.6; }
+.queued-intent { border-left:3px solid var(--cyan); background:#15142a; padding:12px; overflow-wrap:anywhere; color:#f3e7ff!important; }
+.roll-math { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
+.roll-math span { font-size:11px; font-weight:800; padding:7px 10px; color:var(--cyan); border:1px solid #554477; background:#18122d; }
+.roll-required-button { width:100%; display:flex; align-items:center; justify-content:space-between; min-height:52px; font-size:13px; letter-spacing:1px; }
+.roll-wait { margin:12px 0 0; font-size:10px!important; }
+#ready-state { font-weight:800; color:var(--cyan); }
+@media(max-width:1250px){
+ .game-layout { grid-template-columns:minmax(180px,220px) minmax(0,1fr); }
+ .game-layout .story { grid-column:2; grid-row:1 / span 2; }
+ .game-layout .roster { grid-column:1; grid-row:1; }
+ .game-layout .transmissions { grid-column:1; grid-row:2; }
+}
+@media(max-width:850px){
+ .game-layout { display:flex; flex-direction:column; align-items:stretch; }
+ .game-layout .story { order:1; width:100%; min-height:0; }
+ .game-layout .roster { order:2; width:100%; }
+ .game-layout .transmissions { order:3; width:100%; min-height:0; max-height:none; }
+ .game .mission-strip { flex-wrap:wrap; height:auto; }
+ .story-content { padding:clamp(10px,2.6vw,20px); }
+ .game-bar { height:auto; min-height:60px; padding-block:8px; flex-wrap:wrap; }
+ .session-bits { flex-wrap:wrap; }
+}
+@media(max-width:520px){
+ .game { padding:0 8px 12px; }
+ .game-bar { gap:6px; }
+ .tactical-panel { padding:8px 6px; }
+ .tactical-head { align-items:flex-start; }
+ .map-key { gap:5px 8px; }
+ .map-grid .map-cell { font-size:10px; }
+ .map-grid .map-token { font-size:11px; }
+ .roll-dialog-content { grid-template-columns:1fr; gap:12px; }
+ .roll-die-symbol { width:84px; margin:0 auto; font-size:33px; }
+ .roll-dialog-top { font-size:8px; padding:11px; }
+ .roll-info h2 { font-size:30px; }
+ .roll-info p { font-size:11px; }
+ .action-console .console-bottom { flex-wrap:wrap; }
+ .console-bottom .hint { max-width:none; }
+}

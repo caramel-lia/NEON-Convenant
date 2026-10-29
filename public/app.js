@@ -2,7 +2,7 @@
 
 (() => {
   const $ = (id) => document.getElementById(id);
-  const app = { mode: 'create', role: 'netrunner', approach: 'hack', code: null, token: null, state: null, busy: false, quickBusy: false, filter: 'all', sceneKey: null, eventKey: null, mapKey: null, mapMode: 'move', terrain: 'wall', toastTimer: null };
+  const app = { mode: 'create', role: 'netrunner', approach: 'hack', code: null, token: null, state: null, busy: false, quickBusy: false, filter: 'all', sceneKey: null, eventKey: null, mapKey: null, mapMode: 'move', terrain: 'wall', toastTimer: null, actionRollBusy: false };
   const ROLES = { netrunner: 'NETRUNNER', solo: 'SOLO', ghost: 'GHOST', techie: 'TECHIE', fixer: 'FIXER' };
   const MODE_LABELS = { create: 'INITIALIZE CAMPAIGN', join: 'LINK TO CREW' };
 
@@ -79,7 +79,7 @@
 
   function backToEntry() {
     app.code = null; app.token = null; app.state = null;
-    app.sceneKey = null; app.eventKey = null; app.mapKey = null; app.mapMode = 'move'; app.busy = false; app.quickBusy = false;
+    app.sceneKey = null; app.eventKey = null; app.mapKey = null; app.mapMode = 'move'; app.busy = false; app.quickBusy = false; app.actionRollBusy = false;
     $('landing').hidden = false;
     $('game').hidden = true;
     $('scene-view').hidden = true;
@@ -115,7 +115,7 @@
       const member = el('div', `roster-member${player.id === state.me ? ' me' : ''}`);
       const header = el('div', 'member-line');
       header.append(el('span', 'member-name', `${player.name}${player.host ? ' ✦' : ''}`));
-      header.append(el('span', `member-status${player.ready ? ' ready' : ''}`, state.status === 'lobby' ? 'LINKED' : (player.ready ? 'READY' : 'IDLE')));
+      header.append(el('span', `member-status${player.ready ? ' ready' : ''}`, state.status === 'lobby' ? 'LINKED' : (player.ready ? 'ROLLED ✓' : state.actions.some((a) => a.player_id === player.id) ? 'D20 NEEDED' : 'IDLE')));
       member.append(header, el('div', 'member-role', `${ROLES[player.role] || player.role} // Lv.01`));
       const track = el('div', 'hp-track');
       const fill = el('div', 'hp-fill');
@@ -232,6 +232,7 @@
       roster.append(entry);
     });
     $('map-party').replaceChildren(roster);
+    resizeMap();
   }
 
   function drawLastRoll(state) {
@@ -274,7 +275,10 @@
     const player = state?.players.find((p) => p.id === state.me);
     const inLobby = state?.status === 'lobby' || state?.status === 'starting';
     const active = !!state && state.status === 'active';
-    const hasAction = !!state?.actions.some((a) => a.player_id === state.me);
+    const myAction = state?.actions.find((a) => a.player_id === state.me);
+    const hasAction = !!myAction;
+    const mustRoll = !!myAction && !myAction.roll && active;
+    const allRolled = !!state?.actions.length && state.actions.every((action) => !!action.roll);
     const locked = app.busy || !!state?.pending;
     $('lobby-view').hidden = !inLobby;
     $('scene-view').hidden = !active || !state.scene;
@@ -285,8 +289,9 @@
     $('submit-action').disabled = !active || locked || hasAction;
     $('action-text').disabled = !active || locked || hasAction;
     document.querySelectorAll('.approach').forEach((button) => { button.disabled = !active || locked || hasAction; });
-    $('ready-state').textContent = locked ? 'GM PROCESSING…' : hasAction ? '✓ ACTION LOCKED' : '● YOUR MOVE';
-    $('force-resolve').hidden = !active || !player?.host || state.actions.length === 0 || locked || state.actions.length === state.players.length;
+    $('ready-state').textContent = locked ? 'GM PROCESSING…' : mustRoll ? '⚄ ROLL D20 TO CONTINUE' : hasAction ? '✓ ROLLED // WAITING FOR CREW' : '● YOUR MOVE';
+    $('force-resolve').hidden = !active || !player?.host || !allRolled || locked;
+    $('force-resolve').textContent = state?.actions.length === state?.players.length ? '↻ HOST: RETRY GM RESOLUTION' : '⌁ HOST: ADVANCE WITH ROLLED ACTIONS';
     $('sim-status').textContent = state?.pending ? '◌ GENERATING WORLD…' : active ? '● SIMULATION LIVE' : '● GM STANDBY';
     $('session-indicator').textContent = locked ? '◌ PROCESSING' : '● CONNECTED';
     $('map-grid').querySelectorAll('.map-cell').forEach((cell) => { cell.disabled = !state || !!state.pending || app.quickBusy; });
@@ -294,7 +299,20 @@
     $('map-edit').disabled = !state || !!state.pending || app.quickBusy;
     $('map-reset').disabled = !state || !!state.pending || app.quickBusy;
     document.querySelectorAll('[data-terrain]').forEach((button) => { button.disabled = !state || !!state.pending || app.quickBusy; });
-    $('roll-dice').disabled = !state || app.quickBusy;
+    $('roll-dice').disabled = !state || app.quickBusy || mustRoll;
+    const overlay = $('action-roll-overlay');
+    overlay.hidden = !mustRoll;
+    if (mustRoll) {
+      const stats = {force:'edge',stealth:'ghost',hack:'tech',talk:'ghost',investigate:'tech'};
+      const bonuses = {force:14,stealth:14,hack:15,talk:14,investigate:13};
+      const bonus = player[stats[myAction.approach]] || 0;
+      $('queued-intent').textContent = myAction.intent;
+      $('action-roll-bonus').textContent = `+${bonus} ${stats[myAction.approach].toUpperCase()}`;
+      $('action-roll-dc').textContent = `DC ${bonuses[myAction.approach]}`;
+      $('roll-required').disabled = app.actionRollBusy || locked;
+      $('roll-required').textContent = app.actionRollBusy ? '◌ ROLLING / RESOLVING...' : '⚄ ROLL 1D20 NOW ↗';
+      if (!app.actionRollBusy && overlay.dataset.actionId !== `${state.round}:${state.me}`) { overlay.dataset.actionId = `${state.round}:${state.me}`; $('roll-required').focus({preventScroll:true}); }
+    }
     $('send-chat').disabled = !state || app.busy;
     $('chat-input').disabled = !state || app.busy;
   }
@@ -306,7 +324,7 @@
     $('sector').textContent = state.scene?.location || 'MERIDIAN-9';
     $('round-number').textContent = String(state.round).padStart(2, '0');
     $('alert-level').textContent = state.scene?.threat || 'UNDETECTED';
-    drawRoster(state); drawStats(state); drawScene(state); drawMap(state); drawEvents(state); drawLastRoll(state); renderControls();
+    drawRoster(state); drawStats(state); drawScene(state); drawMap(state); drawEvents(state); drawLastRoll(state); renderControls(); resizeMap();
   }
 
   async function refresh() {
@@ -332,7 +350,7 @@
     try {
       const result = await api(`/api/rooms/${app.code}/${route}`, 'POST', payload);
       updateState(result);
-      if (route === 'action') toast('ACTION REGISTERED // ROLL COMMITTED');
+      if (route === 'action') toast('ACTION COMMITTED // CLICK ROLL 1D20 TO CONTINUE');
     } catch (err) {
       toast(err.message, true);
       if (route === 'start') {
@@ -341,6 +359,26 @@
       }
       await refresh();
     } finally { setBusy(false); }
+  }
+
+  async function rollRequired() {
+    const action = app.state?.actions.find((item) => item.player_id === app.state.me);
+    if (!action || action.roll || app.actionRollBusy || app.busy) return;
+    app.actionRollBusy = true;
+    $('action-roll-wait').textContent = 'Rolling one server-generated D20; if all players have rolled, Gemini will resolve the scene…';
+    renderControls();
+    try {
+      const result = await api(`/api/rooms/${app.code}/action/roll`, 'POST', {});
+      updateState(result);
+      toast('1D20 ROLLED // ACTION RECORDED');
+    } catch (error) {
+      toast(error.message, true);
+      await refresh();
+    } finally {
+      app.actionRollBusy = false;
+      $('action-roll-wait').textContent = 'Roll one D20 to release your queued action.';
+      renderControls();
+    }
   }
 
   async function quickOperation(route, payload = {}) {
@@ -428,7 +466,25 @@
     }
   }
 
+  // Fit all 14 columns on any available map width, rather than relying on
+  // fixed viewport-based cell sizing and forcing horizontal scrolling.
+  function resizeMap() {
+    const viewport = $('map-grid-scroll');
+    const map = $('map-grid');
+    if (!viewport || !map || !viewport.clientWidth) return;
+    const width = app.state?.map?.width || 14;
+    const gutter = 20;
+    const gap = 2;
+    const available = viewport.clientWidth - gutter - ((width) * gap) - 10;
+    const cell = Math.max(12, Math.min(46, Math.floor(available / width)));
+    map.style.setProperty('--cell-size-live', `${cell}px`);
+    map.style.setProperty('--map-column-count', String(width));
+    map.style.setProperty('--map-row-count', String(app.state?.map?.height || 9));
+  }
+
   function init() {
+    if (window.ResizeObserver) new ResizeObserver(resizeMap).observe($('map-grid-scroll'));
+    window.addEventListener('resize', resizeMap);
     checkHealth();
     $('tab-create').addEventListener('click', () => setEntryMode('create'));
     $('tab-join').addEventListener('click', () => setEntryMode('join'));
@@ -445,7 +501,7 @@
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); $('submit-action').click(); }
     });
     $('force-resolve').addEventListener('click', () => {
-      if (window.confirm('Advance now? Operatives who have not acted will skip this round.')) operation('resolve');
+      if (window.confirm('Advance with all currently rolled actions? Operatives who have not acted will skip this round.')) operation('resolve');
     });
     document.querySelectorAll('.filter').forEach((button) => button.addEventListener('click', () => {
       app.filter = button.dataset.filter;
@@ -473,6 +529,7 @@
       $('roll-mod').value = String(mod);
     }));
     $('roll-dice').addEventListener('click', manualRoll);
+    $('roll-required').addEventListener('click', rollRequired);
     $('roll-reason').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') { event.preventDefault(); manualRoll(); }
     });

@@ -19,7 +19,7 @@ module NeonCovenant
     'force' => 'edge', 'stealth' => 'ghost', 'hack' => 'tech',
     'talk' => 'ghost', 'investigate' => 'tech'
   }.freeze
-  DC = { 'force' => 9, 'stealth' => 9, 'hack' => 10, 'talk' => 9, 'investigate' => 8 }.freeze
+  DC = { 'force' => 14, 'stealth' => 14, 'hack' => 15, 'talk' => 14, 'investigate' => 13 }.freeze
   CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'.chars.freeze
 
   class GameError < StandardError
@@ -88,22 +88,27 @@ module NeonCovenant
     end
 
     def public_player(player, room)
-      player.reject { |key, _| key == 'token_digest' }.merge('ready' => room['actions'].any? { |a| a['player_id'] == player['id'] })
+      player.reject { |key, _| key == 'token_digest' }.merge('ready' => room['actions'].any? { |a| a['player_id'] == player['id'] && a['roll'] })
     end
 
-    def roll_action(player, approach, intent)
+    def prepare_action(player, approach, intent)
       key = APPROACHES[approach.to_s]
       raise GameError, 'Choose an approach.' unless key
-      die1 = SecureRandom.random_number(6) + 1
-      die2 = SecureRandom.random_number(6) + 1
+      { 'player_id' => player['id'], 'name' => player['name'],
+        'approach' => approach, 'intent' => clean_text(intent), 'roll' => nil }
+    end
+
+    def roll_pending_action!(player, action)
+      raise GameError.new('No pending action to roll.', 409) unless action && action['player_id'] == player['id']
+      raise GameError.new('This action has already been rolled.', 409) if action['roll']
+      approach = action.fetch('approach')
+      key = APPROACHES.fetch(approach)
+      die = SecureRandom.random_number(20) + 1
       bonus = player.fetch(key)
       difficulty = DC.fetch(approach)
-      {
-        'player_id' => player['id'], 'name' => player['name'], 'approach' => approach,
-        'intent' => clean_text(intent),
-        'roll' => { 'dice' => [die1, die2], 'bonus' => bonus, 'total' => die1 + die2 + bonus,
-                    'difficulty' => difficulty, 'success' => die1 + die2 + bonus >= difficulty }
-      }
+      action['roll'] = { 'dice' => [die], 'bonus' => bonus, 'total' => die + bonus,
+                         'difficulty' => difficulty, 'success' => die + bonus >= difficulty }
+      action['roll']
     end
 
     # These are independent table dice. They DO NOT replace action rolls or
