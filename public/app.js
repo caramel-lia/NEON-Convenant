@@ -67,7 +67,7 @@
     app.token = token;
     localStorage.setItem(`neon:token:${code}`, token);
     localStorage.setItem('neon:lastRoom', code);
-    history.replaceState(null, '', `/?room=${encodeURIComponent(code)}`);
+    history.replaceState(null, '', `/play?room=${encodeURIComponent(code)}`);
   }
 
   function enterGame() {
@@ -83,7 +83,7 @@
     $('landing').hidden = false;
     $('game').hidden = true;
     $('scene-view').hidden = true;
-    history.replaceState(null, '', '/');
+    history.replaceState(null, '', '/play');
     renderControls();
   }
 
@@ -398,7 +398,7 @@
   }
 
   async function copyInvite() {
-    const url = `${location.origin}/?room=${encodeURIComponent(app.code)}`;
+    const url = `${location.origin}/play?room=${encodeURIComponent(app.code)}`;
     try { await navigator.clipboard.writeText(url); toast('INVITE LINK COPIED TO CLIPBOARD'); }
     catch { window.prompt('COPY THIS CREW INVITE LINK:', url); }
   }
@@ -478,8 +478,12 @@
     });
     $('copy-room').addEventListener('click', copyInvite);
     $('exit-room').addEventListener('click', disconnect);
-    const fromUrl = new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
-    const remembered = fromUrl || localStorage.getItem('neon:lastRoom');
+    const params = new URLSearchParams(location.search);
+    const fromUrl = params.get('room')?.trim().toUpperCase();
+    if (params.get('mode') === 'join') setEntryMode('join');
+    if (params.get('mode') === 'create') setEntryMode('create');
+    if (ROLES[params.get('role')]) chooseRole(params.get('role'));
+    const remembered = fromUrl || (params.get('mode') === 'join' || params.get('mode') === 'create' ? null : localStorage.getItem('neon:lastRoom'));
     if (remembered && /^[A-HJ-NP-Z2-9]{8}$/.test(remembered)) {
       $('join-code').value = remembered;
       setEntryMode('join');

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#080817">
+  <meta name="description" content="NEON COVENANT — a multiplayer cyberpunk tabletop RPG with an AI Game Master.">
+  <title>Jack In | NEON//COVENANT</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="crt" aria-hidden="true"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <main id="landing" class="landing">
+    <header class="landing-top">
+      <a href="/" class="play-home" aria-label="Back to home">← HOME</a><div class="brand"><span class="brand-glyph">⟐</span> NEON<span class="double-slash">//</span>COVENANT <span class="brand-meta">[ RPG.OS ]</span></div>
+      <div class="top-telemetry"><a href="/guide" class="play-guide">PLAYER GUIDE</a> <span class="ping"></span> NETWORK READY <span class="header-sep">|</span> MERIDIAN-9 <span class="header-sep">|</span> v.1.0 // GRID</div>
+    </header>
+    <div class="landing-body">
+      <section class="hero">
+        <div class="eyebrow">[ TRANSMISSION INBOUND / UNAUTHORIZED SIGNAL ]</div>
+        <div class="hero-orbit" aria-hidden="true"><span class="orbit-dot"></span>01 // THE CITY REMEMBERS</div>
+        <h1>YOUR CITY.<br><span>YOUR <em>CREW.</em></span><br>YOUR LAST<br><span class="text-outline">BAD IDEA.</span></h1>
+        <p class="lead">A neon-drenched, choice-driven tabletop RPG. Assemble your crew. Roll the dice. Let an AI Game Master turn your reckless decisions into living consequences.</p>
+        <div class="hero-metrics">
+          <div><strong>01—05</strong><span>OPERATIVES</span></div>
+          <div><strong>14×09</strong><span>TACTICAL GRID</span></div>
+          <div><strong>∞</strong><span>STORIES</span></div>
+        </div>
+        <div class="district-skyline" aria-hidden="true"><pre>  ┆    ╷   ┆          ╷           ╷
+  │    █   ├───┐      █     ╔═══╗ █
+ ▄█▄  █   █░░█   ┌──█──┐  █░░░█ █
+ █░█ ▄█▄  █░░█   │▓░▓░│  █░░░█ █
+ █░█ █░█  ████ ▄▄│▓░▓░│▄▄█████▄█▄▄
+ ══════════ MERIDIAN // NINE ═══════</pre></div>
+        <div class="hero-bottom">// NO SAVE SCUMMING. NO CORPORATE MERCY. ONLY THE NEXT MOVE.</div>
+      </section>
+      <section class="access-panel" aria-label="Terminal access">
+        <div class="panel-chrome"><span><b class="indicator"></b> ACCESS_TERMINAL.exe</span><span>_ □ ×</span></div>
+        <div class="terminal-lines"><p><span>root@meridian</span>:~$ ./jack_in</p><p class="dim">[OK] Encrypted relay established</p><p class="dim">[OK] GEMINI // narrative core standing by</p><p class="emphasis">&gt; IDENTIFY YOURSELF, OPERATIVE<span class="cursor">█</span></p></div>
+        <div class="tabs" role="tablist" aria-label="Connect to a game">
+          <button id="tab-create" class="tab selected" role="tab" aria-selected="true" type="button">[ + NEW CAMPAIGN ]</button>
+          <button id="tab-join" class="tab" role="tab" aria-selected="false" type="button">[ &gt; JOIN CREW ]</button>
+        </div>
+        <form id="entry-form" autocomplete="off">
+          <label class="field-label" for="handle">01 / OPERATIVE HANDLE</label>
+          <input id="handle" name="handle" type="text" minlength="2" maxlength="24" placeholder="e.g. GHOST_404" required autocomplete="nickname">
+          <label class="field-label" for="role">02 / SELECT YOUR ARCHETYPE</label>
+          <div class="roles" id="roles" role="group" aria-label="Character role">
+            <button class="role-button chosen" type="button" data-role="netrunner"><span class="role-icon">⌘</span><b>NETRUNNER</b><small>CODE / +3 TECH</small></button>
+            <button class="role-button" type="button" data-role="solo"><span class="role-icon">✛</span><b>SOLO</b><small>COMBAT / +3 EDGE</small></button>
+            <button class="role-button" type="button" data-role="ghost"><span class="role-icon">◈</span><b>GHOST</b><small>STEALTH / +3 GHOST</small></button>
+            <button class="role-button" type="button" data-role="techie"><span class="role-icon">⚙</span><b>TECHIE</b><small>DEVICES / +3 TECH</small></button>
+            <button class="role-button" type="button" data-role="fixer"><span class="role-icon">◇</span><b>FIXER</b><small>CONTACTS / +2 GHOST</small></button>
+          </div>
+          <div id="create-fields">
+            <label class="field-label" for="theme">03 / CAMPAIGN FREQUENCY</label>
+            <select id="theme" name="theme"><option value="noir">NOIR // HIGH-TECH LOW-LIFE</option><option value="rebellion">REBELLION // BURN THE SYSTEM</option><option value="horror">GHOST SIGNAL // TECHNO-HORROR</option></select>
+          </div>
+          <div id="join-fields" hidden>
+            <label class="field-label" for="join-code">03 / ACCESS CODE</label>
+            <input id="join-code" maxlength="8" placeholder="8-CHARACTER ROOM CODE" spellcheck="false" autocapitalize="characters">
+          </div>
+          <button id="entry-button" class="button-primary launch" type="submit"><span>INITIALIZE CAMPAIGN</span><span>↗</span></button>
+        </form>
+        <p id="server-health" class="server-health" role="status">CHECKING GM CONNECTION…</p>
+        <p class="access-footnote">LIVE GRID / MANUAL DICE / UP TO FIVE PLAYERS<br><span>API access is configured by the server operator.</span></p>
+      </section>
+    </div>
+    <footer class="landing-footer"><span>THE NETWORK IS WATCHING. <a href="/world">WORLD CODEX ↗</a></span><span>BUILD 09.77.221 / ALL SIGNALS ORIGINATE IN MERIDIAN-9</span></footer>
+  </main>
+
+  <main id="game" class="game" hidden>
+    <header class="game-bar">
+      <a href="/" class="play-home" aria-label="Back to home">← HOME</a><div class="game-logo">⟐ <b>NEON<span>//</span>COVENANT</b> <small>GEMINI_GM//LINK</small></div>
+      <div class="session-bits"><span id="session-indicator" class="online-indicator">● CONNECTED</span><span class="info-chip">ROOM <b id="room-code">--------</b></span><button id="copy-room" class="small-button" type="button">⧉ INVITE</button><button id="exit-room" class="small-button muted-button" type="button">DISCONNECT</button></div>
+    </header>
+    <div class="mission-strip"><div><span class="strip-label">CURRENT OPERATION</span><strong id="operation-name">AWAITING BOOT SEQUENCE</strong></div><div><span class="strip-label">SECTOR</span><strong id="sector">MERIDIAN-9</strong></div><div><span class="strip-label">ROUND</span><strong id="round-number">--</strong></div><div><span class="strip-label">ALERT LEVEL</span><strong id="alert-level" class="alert-text">UNKNOWN</strong></div></div>
+    <div class="game-layout">
+      <aside class="roster pane">
+        <div class="pane-header"><span>01 // CREW ROSTER</span><span id="capacity">0 / 5</span></div>
+        <div id="roster-list" class="roster-list"></div>
+        <div class="personal-stats">
+          <div class="section-label">◢ YOUR CHARACTER</div>
+          <div id="my-stats"></div>
+        </div>
+        <div class="rules-hint"><b>/// SYSTEM RULES</b><p>Roll 2D6 + stat. Meet or beat the DC. Failure changes the story—it never ends it.</p><p>EDGE: force &nbsp; GHOST: stealth/talk<br>TECH: hack/investigate</p></div>
+      </aside>
+      <section class="story pane">
+        <div class="pane-header"><span>02 // THE SIMULATION</span><span id="sim-status"><span class="ping"></span> GEMINI GM STANDBY</span></div>
+        <div id="lobby-view" class="lobby-view">
+          <div class="large-orbit">◉</div>
+          <div class="lobby-title">THE CREW IS <span>ASSEMBLING</span></div>
+          <p class="lobby-copy">You're plugged into Meridian-9. Invite up to four more operatives with the room code above. Once the host boots the campaign, the Game Master takes control of the city.</p>
+          <div class="lobby-steps"><div><span>01</span> BUILD YOUR CREW <b>✓</b></div><div><span>02</span> INVITE OPERATIVES <b>↗</b></div><div><span>03</span> JACK INTO MERIDIAN-9 <b>◌</b></div></div>
+          <div id="lobby-grid-anchor"></div>
+          <button id="start-game" class="button-primary" type="button">[ BOOT THE CAMPAIGN ] <span>↗</span></button>
+          <p id="host-instruction" class="hint">Waiting for host authorization…</p>
+          <p id="gm-error" class="gm-error" hidden role="alert"></p>
+        </div>
+        <div id="scene-view" hidden>
+          <div class="story-content">
+            <div class="story-kicker">◢ LIVE NARRATIVE / GM TRANSMISSION</div>
+            <h2 id="scene-title">NO SIGNAL</h2>
+            <div class="scene-headline"><span>OBJECTIVE</span><p id="scene-objective">STANDBY</p></div>
+            <section id="tactical-map" class="tactical-panel" aria-label="Shared tactical grid">
+              <div class="tactical-head"><div><div class="section-label">◢ 04 // TACTICAL GRID <span class="micro-tag">LIVE SYNC</span></div><div class="map-location" id="map-location">MERIDIAN-9 // STAGING GRID</div></div><div class="map-toolbar"><button type="button" class="map-mode active" id="map-move">[ MOVE ]</button><button type="button" class="map-mode" id="map-edit" hidden>[ HOST: EDIT ]</button><button type="button" class="map-mode subtle" id="map-reset" hidden title="Regenerate a grid from the current sector">↻</button></div></div>
+              <div id="map-palette" class="map-palette" hidden aria-label="Terrain paint selector"><span>PAINT &gt;</span><button type="button" data-terrain="floor">· FLOOR</button><button type="button" data-terrain="wall">▥ WALL</button><button type="button" data-terrain="cover">▤ COVER</button><button type="button" data-terrain="objective">◇ OBJECTIVE</button><button type="button" data-terrain="hazard">⚠ HAZARD</button></div>
+              <div class="map-grid-scroll"><div id="map-grid" class="map-grid" role="group" aria-label="Interactive 14 by 9 map grid"></div></div>
+              <div id="map-party" class="map-party" aria-label="Player map symbols"></div>
+              <div id="map-hint" class="map-hint">Select a tile to move your operative up to 4 squares. Walls and other operatives block movement.</div>
+              <div class="map-key"><span><b>·</b> FLOOR</span><span><b>▥</b> WALL</span><span><b>▤</b> COVER</span><span><b>◇</b> OBJECTIVE</span><span><b>⚠</b> HAZARD</span></div>
+            </section>
+            <div id="scene-grid-anchor"></div>
+            <div id="scene-narration" class="scene-narration"></div>
+            <div class="scenario-options"><div class="subhead">// SUGGESTED PATHS — OR WRITE YOUR OWN</div><div id="suggestions" class="suggestion-grid"></div></div>
+          </div>
+          <div class="action-console">
+            <div class="console-title"><span>◢ ACTION INPUT</span><span id="ready-state">AWAITING INPUT</span></div>
+            <div class="approach-row" id="approach-buttons"><button type="button" class="approach active" data-approach="hack">⌘ HACK</button><button type="button" class="approach" data-approach="force">✛ FORCE</button><button type="button" class="approach" data-approach="stealth">◈ STEALTH</button><button type="button" class="approach" data-approach="talk">◇ TALK</button><button type="button" class="approach" data-approach="investigate">⊕ INVESTIGATE</button></div>
+            <label for="action-text" class="visually-hidden">Your action</label>
+            <textarea id="action-text" maxlength="360" rows="3" placeholder="&gt; Describe your move. Anything is possible if you're willing to roll for it..."></textarea>
+            <div class="console-bottom"><span class="hint">CTRL + ENTER TO COMMIT / 2D6 ROLLED SERVER-SIDE</span><button id="submit-action" class="button-primary" type="button">COMMIT ACTION ↗</button></div>
+            <button id="force-resolve" class="force-resolve" type="button" hidden>⌁ HOST: ADVANCE WITH SUBMITTED ACTIONS</button>
+          </div>
+        </div>
+        <div id="gm-pending" class="gm-pending" hidden><div class="spinner">▦</div> DECRYPTING REALITY… THE GAME MASTER IS WRITING YOUR FATE <span class="cursor">█</span></div>
+      </section>
+      <aside class="transmissions pane">
+        <div class="pane-header"><span>03 // DATASTREAM</span><span class="signal-bars">▂▄▆█</span></div>
+        <div class="filter-tabs"><button type="button" data-filter="all" class="filter active">ALL</button><button type="button" data-filter="gm" class="filter">GM</button><button type="button" data-filter="roll" class="filter">ROLLS</button><button type="button" data-filter="chat" class="filter">CHAT</button><button type="button" data-filter="map" class="filter">MAP</button></div>
+        <div id="event-stream" class="event-stream" role="log" aria-live="off"></div>
+        <section class="dice-console" aria-label="Manual dice roller">
+          <div class="dice-header"><span>◢ DICE://MANUAL</span><span class="dice-live">2D6 / D20 / CUSTOM</span></div>
+          <div class="dice-fields"><label>COUNT<select id="roll-count" aria-label="Number of dice"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label><label>SIDES<select id="roll-sides" aria-label="Die sides"><option value="4">D4</option><option value="6" selected>D6</option><option value="8">D8</option><option value="10">D10</option><option value="12">D12</option><option value="20">D20</option><option value="100">D100</option></select></label><label>MOD<input id="roll-mod" type="number" value="0" min="-20" max="20" aria-label="Dice modifier"></label></div>
+          <div class="dice-quick"><button type="button" data-preset="2,6,0">2D6</button><button type="button" data-preset="1,20,0">D20</button><button type="button" data-preset="1,100,0">D100</button></div>
+          <input id="roll-reason" type="text" maxlength="80" placeholder="Optional roll note…" aria-label="Reason for manual roll">
+          <button id="roll-dice" type="button" class="dice-submit">⚄ ROLL TO DATASTREAM ↗</button>
+          <p id="last-roll" class="last-roll" aria-live="polite">NO MANUAL ROLLS LOGGED</p>
+          <div class="dice-note">SERVER RANDOMNESS // NO GM TURN USED</div>
+        </section>
+        <div class="chat-compose"><div class="chat-label">◢ CREW CHANNEL // ENCRYPTED</div><div class="chat-row"><input id="chat-input" maxlength="500" placeholder="Send crew transmission…" aria-label="Crew chat"><button id="send-chat" type="button" aria-label="Send chat">↗</button></div></div>
+      </aside>
+    </div>
+    <footer class="game-footer"><span><i class="ping"></i> LINK ESTABLISHED</span><span>ALL MOVES HAVE CONSEQUENCES</span><span id="footer-clock">--:--:--</span></footer>
+  </main>
+</body>
+</html>

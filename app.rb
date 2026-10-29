@@ -105,8 +105,26 @@ module NeonCovenant
       end
     end
 
+    # Public website pages are separate from the authenticated campaign console.
+    # Keep old /?room=... invitation links working by forwarding them to /play.
     get '/' do
-      send_file File.join(settings.public_folder, 'index.html')
+      if params['room'].to_s.match?(/\A[A-HJ-NP-Z2-9]{8}\z/i)
+        redirect to("/play?room=#{params['room'].upcase}"), 302
+      else
+        send_file File.join(settings.public_folder, 'index.html')
+      end
+    end
+
+    get '/play' do
+      send_file File.join(settings.public_folder, 'play.html')
+    end
+
+    get '/guide' do
+      send_file File.join(settings.public_folder, 'guide.html')
+    end
+
+    get '/world' do
+      send_file File.join(settings.public_folder, 'world.html')
     end
 
     get '/health' do
@@ -293,8 +311,14 @@ module NeonCovenant
     end
 
     not_found do
-      content_type :json
-      output({ error: 'Route not found.' }, 404)
+      if request.path_info.start_with?('/api/')
+        content_type :json
+        output({ error: 'Route not found.' }, 404)
+      else
+        content_type :html
+        status 404
+        File.read(File.join(settings.public_folder, '404.html'))
+      end
     end
 
     run! if app_file == $PROGRAM_NAME

@@ -47,3 +47,11 @@
 /* Size lobby cells independently of the central panel width. */
 #lobby-view:has(#tactical-map) .map-grid{display:grid;width:max-content;max-width:none;min-width:0;grid-template-columns:20px repeat(14,30px);grid-template-rows:17px repeat(9,30px);margin-inline:auto}
 @media(max-width:680px){#lobby-view:has(#tactical-map) .map-grid{grid-template-columns:20px repeat(14,26px);grid-template-rows:17px repeat(9,26px)}}
+
+/* Public website /play navigation elements */
+.play-home,.play-guide{color:var(--cyan);font:700 10px var(--mono,Consolas,monospace);letter-spacing:.7px;text-decoration:none;white-space:nowrap}
+.play-home{border:1px solid #5e4b7e;padding:7px 9px;margin-right:12px}
+.play-home:hover,.play-guide:hover{color:var(--violet);border-color:var(--violet)}
+.landing-top,.game-bar{gap:10px}
+.landing-footer a{color:var(--cyan);text-decoration:none}
+@media(max-width:750px){.play-guide{display:none}.play-home{font-size:8px;padding:5px}.landing-top{gap:4px}}
