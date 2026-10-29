@@ -25,3 +25,25 @@
 .dice-console{flex-shrink:0;padding:13px 12px 11px;border-top:1px solid #6d518f;background:linear-gradient(180deg,#1c142b,#100c21)}.dice-header{display:flex;align-items:center;justify-content:space-between;gap:4px;color:var(--violet);font-size:10px;font-weight:900;letter-spacing:.6px;margin-bottom:9px}.dice-live{color:var(--cyan);font-size:8px;font-weight:400}.dice-fields{display:grid;grid-template-columns:1fr 1fr .85fr;gap:5px}.dice-fields label{font-size:8px;color:#b9a6d4;font-weight:800;letter-spacing:.5px}.dice-fields select,.dice-fields input{margin-top:4px;padding:7px 5px;font-size:11px;height:33px;background:#0b0b1a;color:#ecdeff;border:1px solid #584375;width:100%;min-width:0}.dice-quick{display:flex;gap:5px;margin:8px 0}.dice-quick button{border:1px solid #533d73;background:#261934;color:var(--cyan);font-size:9px;font-weight:bold;flex:1;padding:4px}.dice-quick button:hover{border-color:var(--cyan)}#roll-reason{padding:7px 8px;font-size:10px;background:#0a0a19;border:1px solid #584375;width:100%}.dice-submit{display:block;width:100%;margin-top:7px;border:1px solid var(--violet);color:#130d23;background:var(--violet);font-weight:900;padding:9px 4px;letter-spacing:.5px;font-size:10px}.dice-submit:hover:not(:disabled){background:var(--cyan);border-color:var(--cyan)}.dice-submit:disabled{opacity:.4;cursor:default}.last-roll{min-height:18px;margin:8px 0 1px;color:var(--cyan);font-weight:700;font-size:10px;line-height:1.6;overflow-wrap:anywhere}.dice-note{font-size:8px;color:var(--muted)}.event.event-map .event-type{color:var(--cyan)}
 @media(max-width:1250px){.map-grid{--cell-size:clamp(20px,2.3vw,28px)}.map-party{gap:5px 7px}.map-party-member{font-size:8px}}
 @media(max-width:680px){.tactical-panel{padding:10px 8px}.map-grid{--cell-size:26px;width:max-content;max-width:none;min-width:0;grid-template-columns:20px repeat(14,26px);grid-template-rows:17px repeat(9,26px)}.dice-console{padding:12px}.map-mode{padding:5px;font-size:9px}}
+
+/* Repair patch: an actionable, persistent GM boot diagnostic and map in lobby. */
+.gm-error,.server-health{padding:10px 12px;font-size:10px;line-height:1.6;overflow-wrap:anywhere;border:1px solid #66528b;background:#181127;color:#c6a8ff}.gm-error{margin:15px auto 5px;max-width:590px;color:#ffb6d0;border-color:#ad547e}.server-health{margin:14px 24px 0;color:#8ce8f8}.server-health.needs-setup{color:#ffd09c;border-color:#ac783e}.lobby-view #lobby-grid-anchor{margin:26px auto 18px;width:min(100%,690px)}.lobby-view #lobby-grid-anchor .tactical-panel{margin-bottom:0}.lobby-view .map-grid{--cell-size:clamp(22px,2vw,33px)}
+/* A tactical grid makes lobby taller; allow scroll instead of clipping BOOT. */
+#lobby-view{justify-content:flex-start;overflow-y:auto;min-height:0;scrollbar-color:#6e558b #130e20}
+#lobby-view .lobby-copy{flex-shrink:0}
+#lobby-view #lobby-grid-anchor{flex-shrink:0}
+#lobby-view #start-game{flex-shrink:0}
+/* Compact lobby: keep a readable map and the BOOT action within the pane. */
+#lobby-view:has(#tactical-map){padding:14px 18px 22px}
+#lobby-view:has(#tactical-map) .large-orbit,
+#lobby-view:has(#tactical-map) .lobby-steps{display:none}
+#lobby-view:has(#tactical-map) .lobby-title{font-size:26px;margin-top:0}
+#lobby-view:has(#tactical-map) .lobby-copy{font-size:10px;line-height:1.6;max-width:570px;margin:6px auto 0}
+#lobby-view:has(#tactical-map) #lobby-grid-anchor{margin:12px auto;width:100%;max-width:700px}
+#lobby-view:has(#tactical-map) .tactical-panel{padding:10px}
+#lobby-view:has(#tactical-map) .map-grid{--cell-size:clamp(22px,1.95vw,30px)}
+#lobby-view:has(#tactical-map) #start-game{margin:8px 0 0}
+#lobby-view:has(#tactical-map) #host-instruction{margin:8px 0 0}
+/* Size lobby cells independently of the central panel width. */
+#lobby-view:has(#tactical-map) .map-grid{display:grid;width:max-content;max-width:none;min-width:0;grid-template-columns:20px repeat(14,30px);grid-template-rows:17px repeat(9,30px);margin-inline:auto}
+@media(max-width:680px){#lobby-view:has(#tactical-map) .map-grid{grid-template-columns:20px repeat(14,26px);grid-template-rows:17px repeat(9,26px)}}

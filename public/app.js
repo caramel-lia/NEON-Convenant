@@ -237,7 +237,7 @@
   function drawLastRoll(state) {
     const last = [...state.events].reverse().find((event) => event.kind === 'roll' && event.manual);
     $('last-roll').textContent = last
-      ? `LAST ROLL // ${last.dice.join(' + ')} = ${last.total}`
+      ? `LAST ROLL // ${last.count || last.dice.length}D${last.sides || '?'}: [${last.dice.join(', ')}] ${last.modifier > 0 ? '+' : ''}${last.modifier ?? 0} = ${last.total}`
       : 'NO MANUAL ROLLS LOGGED';
   }
 
@@ -266,6 +266,11 @@
 
   function renderControls() {
     const state = app.state;
+    // Keep the shared map visible in the lobby, before any Gemini call.
+    // Move the same DOM node; this preserves grid listeners and token state.
+    const gridPanel = $('tactical-map');
+    const anchor = state?.status === 'active' ? $('scene-grid-anchor') : $('lobby-grid-anchor');
+    if (gridPanel && anchor && gridPanel.parentElement !== anchor) anchor.append(gridPanel);
     const player = state?.players.find((p) => p.id === state.me);
     const inLobby = state?.status === 'lobby' || state?.status === 'starting';
     const active = !!state && state.status === 'active';
@@ -323,12 +328,17 @@
   async function operation(route, payload = {}) {
     if (app.busy || !app.code) return;
     setBusy(true);
+    if (route === 'start') { $('gm-error').hidden = true; $('gm-error').textContent = ''; }
     try {
       const result = await api(`/api/rooms/${app.code}/${route}`, 'POST', payload);
       updateState(result);
       if (route === 'action') toast('ACTION REGISTERED // ROLL COMMITTED');
     } catch (err) {
       toast(err.message, true);
+      if (route === 'start') {
+        $('gm-error').textContent = `GM BOOT FAILED // ${err.message} // You can still use the grid and manual dice. Set DEMO_MODE=true in .env to play without Gemini.`;
+        $('gm-error').hidden = false;
+      }
       await refresh();
     } finally { setBusy(false); }
   }
@@ -404,7 +414,22 @@
     backToEntry();
   }
 
+  async function checkHealth() {
+    try {
+      const data = await api('/health');
+      const mode = data.gm_mode;
+      $('server-health').textContent = mode === 'demo' ? '● DEMO GM ONLINE // NO API KEY REQUIRED'
+        : mode === 'gemini' ? '● GEMINI KEY CONFIGURED // LIVE CALL NOT VERIFIED'
+        : '⚠ GEMINI KEY MISSING // SET GEMINI_API_KEY OR ENABLE DEMO_MODE';
+      $('server-health').classList.toggle('needs-setup', mode === 'unconfigured');
+    } catch (err) {
+      $('server-health').textContent = '⚠ BACKEND UNREACHABLE // START SINATRA SERVER';
+      $('server-health').classList.add('needs-setup');
+    }
+  }
+
   function init() {
+    checkHealth();
     $('tab-create').addEventListener('click', () => setEntryMode('create'));
     $('tab-join').addEventListener('click', () => setEntryMode('join'));
     $('entry-form').addEventListener('submit', submitEntry);

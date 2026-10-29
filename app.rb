@@ -111,7 +111,7 @@ module NeonCovenant
 
     get '/health' do
       content_type :json
-      output(status: 'online', gm_mode: ENV['DEMO_MODE'] == 'true' ? 'demo' : (ENV['GEMINI_API_KEY'].to_s.empty? ? 'unconfigured' : 'gemini'))
+      output(status: 'online', gm_mode: ENV['DEMO_MODE'] == 'true' ? 'demo' : ((ENV['GEMINI_API_KEY'].to_s.strip.empty? || ENV['GEMINI_API_KEY'].include?('your_api_key')) ? 'unconfigured' : 'gemini'))
     end
 
     post '/api/rooms' do
@@ -259,7 +259,7 @@ module NeonCovenant
         plus = r['modifier'] >= 0 ? "+#{r['modifier']}" : r['modifier'].to_s
         note = r['reason'].empty? ? '' : " // #{r['reason']}"
         room['events'] << Game.event('roll', "#{player['name']} / MANUAL #{r['count']}d#{r['sides']} #{plus} → [#{r['dice'].join(', ')}] = #{r['total']}#{note}",
-                                     'player_id' => player['id'], 'manual' => true, 'dice' => r['dice'], 'total' => r['total'])
+                                     'player_id' => player['id'], 'manual' => true, 'dice' => r['dice'], 'total' => r['total'], 'count' => r['count'], 'sides' => r['sides'], 'modifier' => r['modifier'])
         room['events'] = room['events'].last(100)
         Game.public_state(room, player_id: player['id'])
       end

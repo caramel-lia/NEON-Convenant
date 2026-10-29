@@ -186,3 +186,27 @@ node --check public/app.js
 ```
 
 **Testing status:** 22 offline Ruby tests and 718 assertions passed before packaging. All syntax checks passed. The live Sinatra/Gemini integration and a visual browser walkthrough require verification on your Kali host; no real API key is included.
+
+## 9 — FIXED EDITION / Troubleshooting
+
+The repaired version places the **tactical grid in the lobby** as well as during the active campaign. It can now be used **before** Gemini is called, and the lobby scrolls rather than hiding the start button behind an overflowing map. Gemini boot failures remain visible in the lobby instead of disappearing with a temporary toast. The landing screen also distinguishes **demo mode**, **configured Gemini key**, and **missing Gemini key**. The manual dice display now shows modifiers correctly.
+
+To upgrade without losing campaigns:
+
+```bash
+cd ~/NEON-Convenant
+cp -a .env .env.backup 2>/dev/null || true
+cp -a data/rooms data/rooms.backup 2>/dev/null || true
+# Extract the ZIP to a separate folder and copy its source files here.
+# Do NOT overwrite your existing .env or data/rooms folder.
+bundle config set --local path vendor/bundle
+bundle install
+ruby scripts/doctor.rb
+bundle exec ruby app.rb
+```
+
+Visit `http://127.0.0.1:4567/health` to see whether the server is in `demo`, `gemini`, or `unconfigured` mode. That health check does **not** prove Gemini accepts your credentials; it only verifies that an API key has been provided. To test all gameplay **without a Gemini API call**, set `DEMO_MODE=true` in `.env`, restart Sinatra, create a fresh campaign and start it. If demo play works but Gemini mode fails, copy the **HTTP error text** shown in the lobby, not your API key.
+
+Run the included offline tests with `ruby test/game_test.rb`; JS syntax can be checked with `node --check public/app.js` if Node is installed. If the entire app fails to start, copy the final error lines from `bundle exec ruby app.rb` and the nonsecret output of `ruby scripts/doctor.rb`.
+
+**Testing note:** Ruby rule tests and the mocked browser lobby/scene/manual-roll flows were checked locally. A live Sinatra/Gemini round was not tested without a working API key and installed server dependencies in the test environment.
